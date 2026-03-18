@@ -1,15 +1,15 @@
 {
   "items": [
     {
-      "event_id": "hourly_2026-03-16_1738_monza",
+      "event_id": "hourly_2026-03-18_2129_silverstone",
       "title": "Часовая гонка",
-      "track_code": "monza",
-      "track_name": "Monza",
-      "started_at_local": null,
-      "finished_at_local": "2026-03-16 17:38",
+      "track_code": "silverstone",
+      "track_name": "Silverstone",
+      "started_at_local": "2026-03-18 19:59",
+      "finished_at_local": "2026-03-18 21:29",
       "status": "finished",
-      "results_repo_path": "260316_173838_R.json"
+      "results_repo_path": "260318_212923_R.json"
     }
   ],
-  "updated_at": "2026-03-18T16:28:56+03:00"
+  "updated_at": "2026-03-18T21:59:02+03:00"
 }

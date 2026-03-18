@@ -1,13 +1,13 @@
 {
   "title": "Часовая гонка",
   "status": "scheduled",
-  "date": "2026-03-18",
-  "start_time_local": "20:00",
+  "date": "2026-03-19",
+  "start_time_local": "14:00",
   "timezone": "UTC+3",
-  "track_code": "monza",
-  "track_name": "Monza",
+  "track_code": "nurburgring",
+  "track_name": "Nurburgring",
   "server_window": "2h",
-  "session_label": "Evening Slot",
+  "session_label": "Afternoon Slot",
   "details_url": "/hourly/",
-  "updated_at": "2026-03-18T16:28:56+03:00"
+  "updated_at": "2026-03-18T21:59:02+03:00"
 }

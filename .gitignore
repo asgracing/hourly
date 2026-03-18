@@ -1,0 +1,5 @@
+config/
+logs/
+scripts/
+event.json
+*.log

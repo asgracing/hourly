@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Часовая гонка | ASG Racing</title>
+  <meta
+    name="description"
+    content="Расписание, ближайший анонс и последние заезды отдельного сервера ASG Racing для часовых гонок."
+  />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">ASG Racing</div>
+      <h1>Часовая гонка</h1>
+      <p class="subtitle">
+        Отдельный сервер с расписанием, ротацией трасс и публикацией ближайшего анонса.
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Ближайший старт</div>
+          <h2 id="announcement-title">Загрузка...</h2>
+        </div>
+        <div class="status-pill" id="announcement-status">--</div>
+      </div>
+
+      <div class="grid two">
+        <div class="stat">
+          <div class="label">Дата</div>
+          <div class="value" id="announcement-date">--</div>
+        </div>
+        <div class="stat">
+          <div class="label">Время</div>
+          <div class="value" id="announcement-time">--</div>
+        </div>
+        <div class="stat">
+          <div class="label">Трасса</div>
+          <div class="value" id="announcement-track">--</div>
+        </div>
+        <div class="stat">
+          <div class="label">Длительность окна</div>
+          <div class="value" id="announcement-duration">--</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">План</div>
+          <h2>Ближайшие слоты</h2>
+        </div>
+      </div>
+      <div id="schedule-list" class="stack">
+        <div class="empty">Загрузка...</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Архив</div>
+          <h2>Последние заезды</h2>
+        </div>
+      </div>
+      <div id="recent-races-list" class="stack">
+        <div class="empty">Загрузка...</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>

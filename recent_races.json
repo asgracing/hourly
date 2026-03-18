@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "event_id": "hourly_2026-03-16_1738_monza",
+      "title": "Часовая гонка",
+      "track_code": "monza",
+      "track_name": "Monza",
+      "started_at_local": null,
+      "finished_at_local": "2026-03-16 17:38",
+      "status": "finished",
+      "results_repo_path": "260316_173838_R.json"
+    }
+  ],
+  "updated_at": "2026-03-18T16:28:56+03:00"
+}

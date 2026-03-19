@@ -71,8 +71,8 @@
           <a class="top-nav-link-primary nav-social nav-social-discord" href="https://discord.gg/cEPFHXXtTC" target="_blank" rel="noopener noreferrer">Discord</a>
           <a class="top-nav-link-primary nav-social nav-social-telegram" href="https://t.me/+JUymrENgddcyMTdi" target="_blank" rel="noopener noreferrer">Telegram</a>
           <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard">Leaderboard</a>
-          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/races/" data-i18n="navLastRaces">Last Races</a>
-          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/cars/" data-i18n="navCars">Cars</a>
+          <a class="top-nav-link-secondary" href="#schedule" data-i18n="navUpcoming">Upcoming Slots</a>
+          <a class="top-nav-link-secondary" href="#recent-races" data-i18n="navRaceResults">Race Results</a>
           <a class="top-nav-link-secondary is-current" href="#top" data-i18n="navHourly">Hourly Race</a>
         </div>
       </div>
@@ -193,7 +193,7 @@
     </section>
 
     <div class="modal-overlay" id="schedule-modal" aria-hidden="true">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
+      <div class="modal-card modal-card-slot" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
         <button class="modal-close" id="schedule-modal-close" type="button" aria-label="Close" data-i18n-aria-label="closeLabel">✕</button>
         <div class="modal-header">
           <div>
@@ -202,7 +202,6 @@
             <p class="modal-subtitle" id="schedule-modal-subtitle">--</p>
           </div>
         </div>
-        <div class="race-modal-summary" id="schedule-modal-summary"></div>
         <div class="schedule-modal-details" id="schedule-modal-details"></div>
       </div>
     </div>

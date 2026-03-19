@@ -232,6 +232,7 @@ body {
 }
 
 .hero-card {
+  --hero-track-photo: none;
   position: relative;
   overflow: hidden;
   padding: 20px;
@@ -247,7 +248,13 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%);
+  background:
+    linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%),
+    linear-gradient(100deg, rgba(7, 11, 16, 0.78) 0%, rgba(7, 11, 16, 0.56) 34%, rgba(7, 11, 16, 0.74) 100%),
+    var(--hero-track-photo);
+  background-position: center, center, center;
+  background-size: auto, cover, cover;
+  background-repeat: no-repeat;
   pointer-events: none;
 }
 
@@ -325,7 +332,7 @@ h2 {
   padding: 14px 15px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
-  background: rgba(9, 14, 21, 0.24);
+  background: rgba(9, 14, 21, 0.5);
 }
 
 .hero-server-item .value {
@@ -559,6 +566,84 @@ tbody tr:not(.is-interactive-row):hover {
   transform: translateY(-1px);
 }
 
+.schedule-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.schedule-event-card {
+  --schedule-track-photo: none;
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(118deg, rgba(7, 11, 16, 0.2) 0%, rgba(7, 11, 16, 0.2) 38%, rgba(7, 11, 16, 0.2) 100%),
+    radial-gradient(circle at top right, rgba(255, 184, 77, 0.12), transparent 30%),
+    var(--schedule-track-photo),
+    rgba(10, 16, 24, 0.96);
+  background-position: center, top right, center, center;
+  background-size: cover, auto, cover, cover;
+  background-repeat: no-repeat;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.schedule-event-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 209, 102, 0.28);
+  box-shadow: 0 24px 44px rgba(0, 0, 0, 0.3);
+}
+
+.schedule-event-card-inner {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: flex-start;
+  align-self: flex-end;
+  max-width: calc(100% - 28px);
+  margin: 14px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(8, 12, 18, 0.5);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.schedule-event-time {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffd9bb;
+  letter-spacing: 0.02em;
+}
+
+.schedule-event-track {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1.05;
+  color: var(--text);
+  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+}
+
+.schedule-event-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #dce8f7;
+}
+
+.schedule-event-weather img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
 .schedule-table td:first-child {
   white-space: nowrap;
 }
@@ -659,6 +744,7 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .modal-card {
+  --modal-track-photo: none;
   position: relative;
   width: min(920px, 100%);
   max-height: 88vh;
@@ -672,8 +758,27 @@ tbody tr:not(.is-interactive-row):hover {
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
 }
 
+.modal-card-slot {
+  background:
+    linear-gradient(112deg, rgba(7, 11, 16, 0.2) 0%, rgba(7, 11, 16, 0.2) 36%, rgba(7, 11, 16, 0.2) 100%),
+    radial-gradient(circle at top right, rgba(255, 184, 77, 0.12), transparent 30%),
+    var(--modal-track-photo),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 15, 20, 0.98));
+  background-position: center, top right, center, center;
+  background-size: cover, auto, cover, cover;
+  background-repeat: no-repeat;
+}
+
 .modal-card-race {
   width: min(1080px, 100%);
+  background:
+    linear-gradient(112deg, rgba(7, 11, 16, 0.34) 0%, rgba(7, 11, 16, 0.34) 36%, rgba(7, 11, 16, 0.34) 100%),
+    radial-gradient(circle at top right, rgba(255, 184, 77, 0.12), transparent 30%),
+    var(--modal-track-photo),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 15, 20, 0.98));
+  background-position: center, top right, center, center;
+  background-size: cover, auto, cover, cover;
+  background-repeat: no-repeat;
 }
 
 .modal-header {
@@ -718,7 +823,7 @@ tbody tr:not(.is-interactive-row):hover {
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgb(0 0 0 / 50%);
 }
 
 .race-summary-label {
@@ -743,7 +848,7 @@ tbody tr:not(.is-interactive-row):hover {
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(8, 12, 18, 0.6);
 }
 
 .schedule-detail-card-strong .schedule-detail-value,
@@ -862,6 +967,10 @@ body.modal-open {
   }
 
   .hero-announcement-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-cards-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,6 @@
-const announcementUrl = "../hourly-data/announcement.json";
-const recentRacesUrl = "../hourly-data/recent_races.json";
-const scheduleUrl = "../hourly-data/schedule.json";
+const announcementUrl = "https://asgracing.github.io/hourly-data/announcement.json";
+const recentRacesUrl = "https://asgracing.github.io/hourly-data/recent_races.json";
+const scheduleUrl = "https://asgracing.github.io/hourly-data/schedule.json";
 
 const translations = {
   en: {

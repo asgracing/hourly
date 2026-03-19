@@ -73,38 +73,44 @@
 
   <main class="page">
     <section class="hero" id="hourly-home">
-      <div class="eyebrow">ASG Racing</div>
-      <h1 data-i18n="heroTitle">Hourly Race</h1>
-      <p class="subtitle" data-i18n="heroSubtitle">
-        Dedicated ASG Racing server with a fixed schedule, rotating tracks, and a live announcement for the next event.
-      </p>
-    </section>
+      <div class="hero-card">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">ASG Racing</div>
+            <h1 data-i18n="heroTitle">Hourly Race</h1>
+            <p class="hero-subtitle" data-i18n="heroSubtitle">
+              Dedicated ASG Racing server with a fixed schedule, rotating tracks, and a live announcement for the next event.
+            </p>
+          </div>
 
-    <section class="card" id="announcement">
-      <div class="section-head">
-        <div>
-          <div class="eyebrow" data-i18n="announcementEyebrow">Next Event</div>
-          <h2 id="announcement-title" data-i18n="loadingShort">Loading...</h2>
-        </div>
-        <div class="status-pill" id="announcement-status">--</div>
-      </div>
+          <aside class="hero-announcement-card" id="announcement">
+            <div class="hero-announcement-head">
+              <div>
+                <div class="eyebrow hero-announcement-eyebrow" data-i18n="announcementEyebrow">Next Event</div>
+                <h2 id="announcement-title" data-i18n="loadingShort">Loading...</h2>
+              </div>
+              <div class="status-pill" id="announcement-status">--</div>
+            </div>
 
-      <div class="grid two">
-        <div class="stat">
-          <div class="label" data-i18n="labelDate">Date</div>
-          <div class="value" id="announcement-date">--</div>
-        </div>
-        <div class="stat">
-          <div class="label" data-i18n="labelTime">Time</div>
-          <div class="value" id="announcement-time">--</div>
-        </div>
-        <div class="stat">
-          <div class="label" data-i18n="labelTrack">Track</div>
-          <div class="value" id="announcement-track">--</div>
-        </div>
-        <div class="stat">
-          <div class="label" data-i18n="labelWindow">Server Window</div>
-          <div class="value" id="announcement-duration">--</div>
+            <div class="hero-announcement-meta">
+              <div class="stat">
+                <div class="label" data-i18n="labelDate">Date</div>
+                <div class="value" id="announcement-date">--</div>
+              </div>
+              <div class="stat">
+                <div class="label" data-i18n="labelTime">Time</div>
+                <div class="value" id="announcement-time">--</div>
+              </div>
+              <div class="stat">
+                <div class="label" data-i18n="labelTrack">Track</div>
+                <div class="value" id="announcement-track">--</div>
+              </div>
+              <div class="stat">
+                <div class="label" data-i18n="labelWindow">Server Window</div>
+                <div class="value" id="announcement-duration">--</div>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </section>

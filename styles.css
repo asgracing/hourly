@@ -139,6 +139,39 @@ body {
   color: #fff4c7;
 }
 
+.nav-social {
+  min-height: 42px;
+  padding: 10px 18px;
+  font-size: 0.86rem;
+  letter-spacing: 0.015em;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+}
+
+.nav-social.nav-social-discord {
+  background: linear-gradient(135deg, #5865f2, #4752c4);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px rgba(88, 101, 242, 0.34);
+}
+
+.nav-social.nav-social-telegram {
+  background: linear-gradient(135deg, #27a7e7, #168ac7);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px rgba(39, 167, 231, 0.3);
+}
+
+.nav-social:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.nav-social.nav-social-discord:hover {
+  box-shadow: 0 16px 34px rgba(88, 101, 242, 0.42);
+}
+
+.nav-social.nav-social-telegram:hover {
+  box-shadow: 0 16px 34px rgba(39, 167, 231, 0.38);
+}
+
 .lang-switch {
   display: inline-flex;
   align-items: center;
@@ -491,6 +524,12 @@ h2 {
     flex: 0 0 auto;
     padding: 10px 15px;
     font-size: 0.8rem;
+  }
+
+  .nav-social {
+    min-height: 44px;
+    padding: 10px 18px;
+    font-size: 0.84rem;
   }
 
   .lang-btn {

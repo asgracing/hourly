@@ -165,13 +165,35 @@
       <div class="section-head">
         <div>
           <div class="eyebrow" data-i18n="archiveEyebrow">Archive</div>
-          <h2 data-i18n="recentTitle">Recent Races</h2>
+          <h2 data-i18n="racesTableTitle">Race Results</h2>
+          <p class="section-subtitle" data-i18n="racesTableSubtitle">Click any row to open the finishing order.</p>
         </div>
       </div>
-      <div id="recent-races-list" class="stack">
-        <div class="empty" data-i18n="loadingShort">Loading...</div>
+      <div class="table-card table-card-compact">
+        <div class="table-wrap" id="recent-races-table">
+          <div class="empty" data-i18n="loadingShort">Loading...</div>
+        </div>
       </div>
     </section>
+
+    <div class="modal-overlay" id="race-results-modal" aria-hidden="true">
+      <div class="modal-card modal-card-race" role="dialog" aria-modal="true" aria-labelledby="race-results-title">
+        <button class="modal-close" id="race-results-close" type="button" aria-label="Close" data-i18n-aria-label="closeLabel">✕</button>
+        <div class="modal-header">
+          <div>
+            <div class="eyebrow" data-i18n="raceModalEyebrow">Race details</div>
+            <h3 id="race-results-title" class="modal-title">--</h3>
+            <p class="modal-subtitle" id="race-results-subtitle">--</p>
+          </div>
+        </div>
+        <div class="race-modal-summary" id="race-modal-summary"></div>
+        <div class="table-card table-card-modal">
+          <div class="table-wrap" id="race-results-table">
+            <div class="empty" data-i18n="loadingShort">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="./app.js" defer></script>

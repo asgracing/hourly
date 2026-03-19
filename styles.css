@@ -224,7 +224,7 @@ body {
 .page {
   width: min(1200px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 56px;
+  padding: 10px 0 56px;
 }
 
 .hero {
@@ -250,7 +250,7 @@ body {
   inset: 0;
   background:
     linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%),
-    linear-gradient(100deg, rgba(7, 11, 16, 0.78) 0%, rgba(7, 11, 16, 0.56) 34%, rgba(7, 11, 16, 0.74) 100%),
+    linear-gradient(100deg, rgba(7, 11, 16, 0.25) 0%, rgba(7, 11, 16, 0.25) 34%, rgba(7, 11, 16, 0.25) 100%),
     var(--hero-track-photo);
   background-position: center, center, center;
   background-size: auto, cover, cover;
@@ -413,6 +413,12 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  background: rgba(8, 12, 18, 0.24);
+  backdrop-filter: blur(8px);
 }
 
 .hero-vote-actions,
@@ -526,6 +532,11 @@ h2 {
   margin-bottom: 18px;
 }
 
+.card .eyebrow,
+.section-head .eyebrow {
+  display: none;
+}
+
 .section-subtitle,
 .modal-subtitle,
 .race-note {
@@ -535,6 +546,22 @@ h2 {
 .section-subtitle {
   margin-top: 8px;
   line-height: 1.55;
+}
+
+.modal-subtitle {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(8, 12, 18, 0.46);
+  backdrop-filter: blur(8px);
+  line-height: 1.4;
+  color: #f4f8ff;
+  font-weight: 800;
 }
 
 .status-pill {

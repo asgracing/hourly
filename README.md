@@ -16,9 +16,9 @@ Planned runtime environment:
 
 Repository layout:
 - `index.html`, `app.js`, `styles.css` - public hourly page
-- `announcement.json` - next scheduled race for the main site and hourly page
-- `recent_races.json` - latest completed hourly races
-- `schedule.json` - public upcoming schedule
+- `../hourly-data/announcement.json` - next scheduled race for the main site and hourly page
+- `../hourly-data/recent_races.json` - latest completed hourly races
+- `../hourly-data/schedule.json` - public upcoming schedule
 - `event.json` - local reference sample of ACC `cfg/event.json`
 - `config/` - schedule and local state
 - `scripts/` - orchestration and parsing entry points

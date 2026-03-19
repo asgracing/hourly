@@ -1,75 +1,135 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Часовая гонка | ASG Racing</title>
+
+  <meta name="yandex-verification" content="c76adf2164af15e6" />
+  <meta name="google-site-verification" content="Q9-gOMKl6WbBLelP-Vl__xxrrF2Qyrm47kdie0mGxz8" />
+
+  <title>Hourly Race | ASG Racing</title>
   <meta
     name="description"
-    content="Расписание, ближайший анонс и последние заезды отдельного сервера ASG Racing для часовых гонок."
+    content="Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server."
   />
+  <meta
+    name="keywords"
+    content="ASG Racing, ACC, Assetto Corsa Competizione, hourly race, race schedule, racing league, hourly server"
+  />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="ASG Racing" />
+  <meta name="theme-color" content="#0b0f14" />
+
+  <link rel="canonical" href="https://asgracing.github.io/hourly/" />
+  <link rel="icon" href="https://asgracing.github.io/top/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="https://asgracing.github.io/top/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="https://asgracing.github.io/top/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="https://asgracing.github.io/top/apple-touch-icon.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://asgracing.github.io/hourly/" />
+  <meta property="og:title" content="Hourly Race | ASG Racing" />
+  <meta
+    property="og:description"
+    content="Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server."
+  />
+  <meta property="og:image" content="https://asgracing.github.io/top/og-cover.jpg" />
+  <meta property="og:image:alt" content="ASG Racing hourly page preview" />
+  <meta property="og:site_name" content="ASG Racing Hourly Race" />
+  <meta property="og:locale" content="en_US" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Hourly Race | ASG Racing" />
+  <meta
+    name="twitter:description"
+    content="Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server."
+  />
+  <meta name="twitter:image" content="https://asgracing.github.io/top/og-cover.jpg" />
+
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body id="top">
+  <nav class="top-nav" id="top-nav">
+    <div class="top-nav-inner">
+      <a class="top-nav-brand" href="https://asgracing.github.io/top/" aria-label="ASG Racing home">ASG Racing</a>
+      <div class="top-nav-center">
+        <div class="top-nav-menu">
+          <a class="top-nav-link-primary" href="https://discord.gg/cEPFHXXtTC" target="_blank" rel="noopener noreferrer">Discord</a>
+          <a class="top-nav-link-primary" href="https://t.me/+JUymrENgddcyMTdi" target="_blank" rel="noopener noreferrer">Telegram</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard">Leaderboard</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/races/" data-i18n="navLastRaces">Last Races</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/cars/" data-i18n="navCars">Cars</a>
+          <a class="top-nav-link-secondary is-current" href="#top" data-i18n="navHourly">Hourly Race</a>
+        </div>
+      </div>
+      <div class="top-nav-actions">
+        <div class="lang-switch top-nav-lang" aria-label="Language switcher">
+          <button class="lang-btn" type="button" data-lang="en"><span class="lang-flag">🇬🇧</span><span class="lang-text">EN</span></button>
+          <button class="lang-btn" type="button" data-lang="ru"><span class="lang-flag">🇷🇺</span><span class="lang-text">RU</span></button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
   <main class="page">
-    <section class="hero">
+    <section class="hero" id="hourly-home">
       <div class="eyebrow">ASG Racing</div>
-      <h1>Часовая гонка</h1>
-      <p class="subtitle">
-        Отдельный сервер с расписанием, ротацией трасс и публикацией ближайшего анонса.
+      <h1 data-i18n="heroTitle">Hourly Race</h1>
+      <p class="subtitle" data-i18n="heroSubtitle">
+        Dedicated ASG Racing server with a fixed schedule, rotating tracks, and a live announcement for the next event.
       </p>
     </section>
 
-    <section class="card">
+    <section class="card" id="announcement">
       <div class="section-head">
         <div>
-          <div class="eyebrow">Ближайший старт</div>
-          <h2 id="announcement-title">Загрузка...</h2>
+          <div class="eyebrow" data-i18n="announcementEyebrow">Next Event</div>
+          <h2 id="announcement-title" data-i18n="loadingShort">Loading...</h2>
         </div>
         <div class="status-pill" id="announcement-status">--</div>
       </div>
 
       <div class="grid two">
         <div class="stat">
-          <div class="label">Дата</div>
+          <div class="label" data-i18n="labelDate">Date</div>
           <div class="value" id="announcement-date">--</div>
         </div>
         <div class="stat">
-          <div class="label">Время</div>
+          <div class="label" data-i18n="labelTime">Time</div>
           <div class="value" id="announcement-time">--</div>
         </div>
         <div class="stat">
-          <div class="label">Трасса</div>
+          <div class="label" data-i18n="labelTrack">Track</div>
           <div class="value" id="announcement-track">--</div>
         </div>
         <div class="stat">
-          <div class="label">Длительность окна</div>
+          <div class="label" data-i18n="labelWindow">Server Window</div>
           <div class="value" id="announcement-duration">--</div>
         </div>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="schedule">
       <div class="section-head">
         <div>
-          <div class="eyebrow">План</div>
-          <h2>Ближайшие слоты</h2>
+          <div class="eyebrow" data-i18n="scheduleEyebrow">Schedule</div>
+          <h2 data-i18n="scheduleTitle">Upcoming Slots</h2>
         </div>
       </div>
       <div id="schedule-list" class="stack">
-        <div class="empty">Загрузка...</div>
+        <div class="empty" data-i18n="loadingShort">Loading...</div>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="recent-races">
       <div class="section-head">
         <div>
-          <div class="eyebrow">Архив</div>
-          <h2>Последние заезды</h2>
+          <div class="eyebrow" data-i18n="archiveEyebrow">Archive</div>
+          <h2 data-i18n="recentTitle">Recent Races</h2>
         </div>
       </div>
       <div id="recent-races-list" class="stack">
-        <div class="empty">Загрузка...</div>
+        <div class="empty" data-i18n="loadingShort">Loading...</div>
       </div>
     </section>
   </main>

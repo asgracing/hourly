@@ -7,14 +7,15 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-CONFIG_DIR = ROOT_DIR / "config"
+APP_ROOT_DIR = Path(__file__).resolve().parents[1]
+DATA_ROOT_DIR = APP_ROOT_DIR.parent / "hourly-data"
+CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 ROTATION_STATE_PATH = CONFIG_DIR / "rotation_state.json"
 RUNTIME_STATE_PATH = CONFIG_DIR / "runtime_state.json"
-REFERENCE_EVENT_PATH = ROOT_DIR / "event.json"
-PUBLISHER_PATH = ROOT_DIR / "scripts" / "publisher.py"
-LOGS_DIR = ROOT_DIR / "logs"
+REFERENCE_EVENT_PATH = APP_ROOT_DIR / "event.json"
+PUBLISHER_PATH = APP_ROOT_DIR / "scripts" / "publisher.py"
+LOGS_DIR = APP_ROOT_DIR / "logs"
 LOG_FILE_PATH = LOGS_DIR / "orchestrator.log"
 COMMIT_MESSAGE_PREFIX = "Hourly site update"
 UTC_PLUS_3 = timezone(timedelta(hours=3))
@@ -95,7 +96,7 @@ def resolve_python_executable() -> str:
 def run_git(args: list[str]):
     result = subprocess.run(
         ["git"] + args,
-        cwd=str(ROOT_DIR),
+        cwd=str(DATA_ROOT_DIR),
         capture_output=True,
         text=True,
     )
@@ -316,7 +317,7 @@ def main():
             logging.info("Running publisher: %s", PUBLISHER_PATH)
             publisher_result = subprocess.run(
                 [resolve_python_executable(), str(PUBLISHER_PATH)],
-                cwd=str(ROOT_DIR),
+                cwd=str(APP_ROOT_DIR),
                 capture_output=True,
                 text=True,
             )

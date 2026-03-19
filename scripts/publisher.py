@@ -3,13 +3,14 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-CONFIG_DIR = ROOT_DIR / "config"
+APP_ROOT_DIR = Path(__file__).resolve().parents[1]
+DATA_ROOT_DIR = APP_ROOT_DIR.parent / "hourly-data"
+CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 RUNTIME_STATE_PATH = CONFIG_DIR / "runtime_state.json"
-SCHEDULE_PATH = ROOT_DIR / "schedule.json"
-ANNOUNCEMENT_PATH = ROOT_DIR / "announcement.json"
-RECENT_RACES_PATH = ROOT_DIR / "recent_races.json"
+SCHEDULE_PATH = DATA_ROOT_DIR / "schedule.json"
+ANNOUNCEMENT_PATH = DATA_ROOT_DIR / "announcement.json"
+RECENT_RACES_PATH = DATA_ROOT_DIR / "recent_races.json"
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 
 

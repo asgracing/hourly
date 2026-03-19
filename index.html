@@ -10,9 +10,28 @@
   />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body id="top">
+  <nav class="top-nav" id="top-nav">
+    <div class="top-nav-inner">
+      <a class="top-nav-brand" href="https://asgracing.github.io/top/" aria-label="ASG Racing home">ASG Racing</a>
+      <div class="top-nav-center">
+        <div class="top-nav-menu">
+          <a class="top-nav-link-primary" href="https://discord.gg/cEPFHXXtTC" target="_blank" rel="noopener noreferrer">Discord</a>
+          <a class="top-nav-link-primary" href="https://t.me/+JUymrENgddcyMTdi" target="_blank" rel="noopener noreferrer">Telegram</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/">Leaderboard</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/races/">Last Races</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/cars/">Cars</a>
+          <a class="top-nav-link-secondary is-current" href="#top">Hourly Race</a>
+        </div>
+      </div>
+      <div class="top-nav-actions">
+        <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/">Back To Top</a>
+      </div>
+    </div>
+  </nav>
+
   <main class="page">
-    <section class="hero">
+    <section class="hero" id="hourly-home">
       <div class="eyebrow">ASG Racing</div>
       <h1>Часовая гонка</h1>
       <p class="subtitle">
@@ -20,7 +39,7 @@
       </p>
     </section>
 
-    <section class="card">
+    <section class="card" id="announcement">
       <div class="section-head">
         <div>
           <div class="eyebrow">Ближайший старт</div>
@@ -49,7 +68,7 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="schedule">
       <div class="section-head">
         <div>
           <div class="eyebrow">План</div>
@@ -61,7 +80,7 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="recent-races">
       <div class="section-head">
         <div>
           <div class="eyebrow">Архив</div>

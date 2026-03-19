@@ -7,6 +7,8 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+import hourly_planning as planning
+
 
 APP_ROOT_DIR = Path(__file__).resolve().parents[1]
 DATA_ROOT_DIR = APP_ROOT_DIR.parent / "hourly-data"
@@ -176,9 +178,16 @@ def update_rotation_state(rotation_state: dict, selected_track: dict, selected_i
     return rotation_state
 
 
-def update_runtime_state(runtime_state: dict, event_config_path: Path, selected_track: dict):
+def update_runtime_state(runtime_state: dict, event_config_path: Path, selected_track: dict, selected_slot: dict, planned_weather: dict):
     runtime_state["last_track_code"] = selected_track.get("code")
     runtime_state["last_event_config_path"] = str(event_config_path)
+    runtime_state["active_event_id"] = selected_slot.get("event_id")
+    runtime_state["last_planned_start_local"] = (
+        f"{selected_slot.get('date')}T{selected_slot.get('start_time_local')}:00+03:00"
+        if selected_slot.get("date") and selected_slot.get("start_time_local")
+        else None
+    )
+    runtime_state["last_planned_weather"] = planned_weather
     runtime_state["last_status"] = "track_selected"
     runtime_state["last_error"] = None
     runtime_state["updated_at"] = now_local_iso()
@@ -198,9 +207,24 @@ def update_runtime_state_after_stop(runtime_state: dict):
     runtime_state["last_actual_stop_local"] = now_local_iso()
     runtime_state["last_status"] = "server_stopped"
     runtime_state["server_pid"] = None
+    runtime_state["active_event_id"] = None
     runtime_state["last_error"] = None
     runtime_state["updated_at"] = now_local_iso()
     return runtime_state
+
+
+def apply_planned_weather(event_config: dict, planned_weather: dict):
+    if not isinstance(planned_weather, dict):
+        return event_config
+    if planned_weather.get("ambient_temp_c") is not None:
+        event_config["ambientTemp"] = planned_weather.get("ambient_temp_c")
+    if planned_weather.get("cloud_level") is not None:
+        event_config["cloudLevel"] = planned_weather.get("cloud_level")
+    if planned_weather.get("rain_level") is not None:
+        event_config["rain"] = planned_weather.get("rain_level")
+    if planned_weather.get("weather_randomness") is not None:
+        event_config["weatherRandomness"] = planned_weather.get("weather_randomness")
+    return event_config
 
 
 def collect_result_file_names(results_dir_path: Path) -> set[str]:
@@ -278,12 +302,23 @@ def main():
         runtime_state = load_json(RUNTIME_STATE_PATH)
         run_duration_seconds, run_mode = resolve_run_mode(schedule_config)
 
-        selected_track, selected_index = choose_next_track(schedule_config, rotation_state)
+        _, selected_index = choose_next_track(schedule_config, rotation_state)
+        schedule_items = planning.build_schedule_slots(schedule_config, rotation_state)
+        runtime_state, schedule_items = planning.ensure_planned_weather(runtime_state, schedule_items, schedule_config)
+        if not schedule_items:
+            raise RuntimeError("No upcoming hourly slots available for launch.")
+        selected_slot = schedule_items[0]
+        selected_track = {
+            "code": selected_slot.get("track_code"),
+            "name": selected_slot.get("track_name"),
+        }
+        planned_weather = selected_slot.get("weather") or planning.get_planned_weather_for_slot(runtime_state, selected_slot.get("event_id"))
         event_config_path = resolve_event_config_path(schedule_config)
         server_exe_path = resolve_server_exe_path(schedule_config)
         results_dir_path = resolve_results_dir_path(schedule_config)
         track_key = get_track_key(schedule_config)
         logging.info("Selected track candidate: %s", selected_track["code"])
+        logging.info("Resolved slot event id: %s", selected_slot.get("event_id"))
         logging.info("Resolved ACC event config path: %s", event_config_path)
         logging.info("Resolved server exe path: %s", server_exe_path)
         logging.info("Resolved results dir path: %s", results_dir_path)
@@ -301,15 +336,24 @@ def main():
         event_config, event_encoding = load_json_with_encoding(event_config_path)
         previous_track = event_config.get(track_key)
         event_config[track_key] = selected_track["code"]
+        event_config = apply_planned_weather(event_config, planned_weather)
         logging.info("Previous track: %s", previous_track)
         logging.info("Writing new track '%s' into key '%s'", selected_track["code"], track_key)
+        if planned_weather:
+            logging.info(
+                "Applying planned weather: temp=%s cloud=%s rain=%s randomness=%s",
+                planned_weather.get("ambient_temp_c"),
+                planned_weather.get("cloud_level"),
+                planned_weather.get("rain_level"),
+                planned_weather.get("weather_randomness"),
+            )
 
         save_json(event_config_path, event_config, encoding=event_encoding)
         save_json(
             ROTATION_STATE_PATH,
             update_rotation_state(rotation_state, selected_track, selected_index, len(schedule_config["tracks"]))
         )
-        runtime_state = update_runtime_state(runtime_state, event_config_path, selected_track)
+        runtime_state = update_runtime_state(runtime_state, event_config_path, selected_track, selected_slot, planned_weather)
         save_json(RUNTIME_STATE_PATH, runtime_state)
 
         process = subprocess.Popen(

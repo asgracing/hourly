@@ -4,6 +4,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import hourly_planning as planning
+
 APP_ROOT_DIR = Path(__file__).resolve().parents[1]
 DATA_ROOT_DIR = APP_ROOT_DIR.parent / "hourly-data"
 CONFIG_DIR = DATA_ROOT_DIR / "config"
@@ -252,11 +254,12 @@ def is_exception(schedule_config: dict, slot_date: str, slot_time: str):
     return any(matches_slot(entry, slot_date, slot_time) for entry in schedule_config.get("exceptions") or [])
 
 
-def build_schedule(schedule_config: dict, rotation_state: dict):
+def build_schedule(schedule_config: dict, rotation_state: dict, event_config: dict):
     timezone_label = schedule_config.get("timezone", "UTC+3")
     launch_times = parse_launch_times(schedule_config)
     tracks = schedule_config.get("tracks") or []
     track_lookup = build_track_lookup(schedule_config)
+    weather_info = build_weather_info(event_config)
     if not launch_times or not tracks:
         return {"items": [], "updated_at": now_local_iso()}
     next_track_index = rotation_state.get("next_track_index", 0)
@@ -289,6 +292,7 @@ def build_schedule(schedule_config: dict, rotation_state: dict):
                 "track_name": override.get("track_name") if override else None,
                 "slot_label": (override or {}).get("slot_label") or determine_slot_label(launch_time),
                 "status": (override or {}).get("status", "scheduled"),
+                "rain_level": weather_info.get("rain_level"),
             }
             item["track_name"] = item["track_name"] or selected_track.get("name") or normalize_track_name(selected_track.get("code"))
             items.append(item)
@@ -304,11 +308,14 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
     accessory_info = build_accessory_info(settings_data, event_config, event_rules)
     future_items = []
     for item in items or []:
-        slot_dt = parse_slot_datetime(item)
+        slot_dt = planning.parse_slot_datetime(item)
         if slot_dt and slot_dt >= now_local():
             future_items.append((slot_dt, item))
     future_items.sort(key=lambda pair: pair[0])
     next_item = future_items[0][1] if future_items else None
+    planned_weather = next_item.get("weather") if isinstance(next_item, dict) else None
+    if not isinstance(planned_weather, dict):
+        planned_weather = accessory_info.get("weather")
     if not next_item:
         return {
             "title": schedule_config.get("title", "Часовая гонка"),
@@ -323,6 +330,7 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
             "details_url": "/hourly/",
             "updated_at": now_local_iso(),
             **accessory_info,
+            "weather": planned_weather,
         }
     return {
         "title": schedule_config.get("title", "Часовая гонка"),
@@ -337,6 +345,7 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
         "details_url": "/hourly/",
         "updated_at": now_local_iso(),
         **accessory_info,
+        "weather": planned_weather,
     }
 
 
@@ -786,9 +795,12 @@ def main():
     event_config = load_json(resolve_event_config_path(schedule_config), default={}) or {}
     event_rules = load_json(resolve_event_rules_path(schedule_config), default={}) or {}
     results_dir_path = resolve_results_dir_path(schedule_config)
-    schedule_data = build_schedule(schedule_config, rotation_state)
+    schedule_items = planning.build_schedule_slots(schedule_config, rotation_state)
+    runtime_state, schedule_items = planning.ensure_planned_weather(runtime_state, schedule_items, schedule_config)
+    schedule_data = {"items": schedule_items, "updated_at": now_local_iso()}
     announcement = build_announcement(schedule_data, schedule_config, settings_data, event_config, event_rules)
     recent_races_summary, recent_races_details = build_recent_races(results_dir_path)
+    save_json(RUNTIME_STATE_PATH, runtime_state)
     save_json(SCHEDULE_PATH, schedule_data)
     save_json(ANNOUNCEMENT_PATH, announcement)
     save_json(RECENT_RACES_PATH, recent_races_summary)

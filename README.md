@@ -19,6 +19,33 @@ Recommended config paths in `schedule_config.json`:
 - `event_rules_path`: `cfg\\eventRules.json`
 - `settings_path`: `cfg\\settings.json`
 
+Optional planned weather config in `schedule_config.json`:
+- `weather_planning.slots_ahead`: how many future slots keep a locked weather plan for; default `3`
+- `weather_planning.ambient_temp_range_c`: global ambient temperature range, for example `[14, 24]`
+- `weather_planning.profiles`: weighted scenario list used only when a slot gets weather for the first time
+
+Example `weather_planning` block:
+```json
+"weather_planning": {
+  "slots_ahead": 3,
+  "ambient_temp_range_c": [14, 24],
+  "profiles": [
+    { "id": 1, "weight": 14, "cloud_range": [0.25, 0.35], "rain_range": [0.2, 0.2], "randomness_range": [5, 7], "summary_key": "mixed" },
+    { "id": 2, "weight": 18, "cloud_range": [0.45, 0.6], "rain_range": [0.0, 0.0], "randomness_range": [5, 7], "summary_key": "mixed" },
+    { "id": 3, "weight": 16, "cloud_range": [0.6, 1.0], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "cloudy" },
+    { "id": 4, "weight": 24, "cloud_range": [0.0, 0.4], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "clear" },
+    { "id": 5, "weight": 14, "cloud_range": [0.6, 0.9], "rain_range": [0.0, 0.0], "randomness_range": [4, 7], "summary_key": "cloudy" },
+    { "id": 6, "weight": 9, "cloud_range": [0.6, 0.8], "rain_range": [0.1, 0.3], "randomness_range": [1, 3], "summary_key": "wet" },
+    { "id": 7, "weight": 5, "cloud_range": [0.6, 1.0], "rain_range": [0.45, 0.8], "randomness_range": [1, 3], "summary_key": "wet" }
+  ]
+}
+```
+
+Runtime behavior:
+- publisher builds the next `3` slots, creates missing planned weather once, and stores it in `config/runtime_state.json`
+- announcement and schedule JSON are published from that planned weather
+- orchestrator reads the planned weather for the active slot and writes it into ACC `cfg/event.json` before server launch
+
 Repository layout:
 - `index.html`, `app.js`, `styles.css` - public hourly page
 - `../hourly-data/announcement.json` - next scheduled race for the main site and hourly page

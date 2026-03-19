@@ -28,6 +28,13 @@ const translations = {
     scheduleEyebrow: "Schedule",
     archiveEyebrow: "Archive",
     scheduleTitle: "Upcoming Slots",
+    scheduleTableSubtitle: "Click any row to open the slot briefing.",
+    scheduleCols: ["Date + UTC", "Track", "Rain"],
+    openScheduleDetailsLabel: "Open slot details",
+    scheduleModalEyebrow: "Slot details",
+    scheduleModalDateTime: "Date & time",
+    scheduleModalSlot: "Slot",
+    scheduleModalRain: "Rain forecast",
     recentTitle: "Recent Races",
     labelDate: "Date",
     labelTime: "Time",
@@ -158,10 +165,21 @@ const translations = {
   }
 };
 
+Object.assign(translations.ru, {
+  scheduleTableSubtitle: "Нажми на строку, чтобы открыть детали слота.",
+  scheduleCols: ["Дата + UTC", "Трасса", "Дождь"],
+  openScheduleDetailsLabel: "Открыть детали слота",
+  scheduleModalEyebrow: "Детали слота",
+  scheduleModalDateTime: "Дата и время",
+  scheduleModalSlot: "Слот",
+  scheduleModalRain: "Прогноз дождя"
+});
+
 let currentLang = "en";
 let announcementData = {};
 let scheduleItems = [];
 let recentRaceItems = [];
+let selectedScheduleItem = null;
 let selectedRace = null;
 let hasLoadError = false;
 const raceDetailsCache = new Map();
@@ -254,6 +272,63 @@ function buildWeatherSummary(weather) {
   if (rainPercent !== null) parts.push(tf("weatherRain", { value: rainPercent }));
   if (typeof weather.weather_randomness === "number") parts.push(tf("weatherRandomness", { value: weather.weather_randomness }));
   return compactJoin(parts) || t("unknownValue");
+}
+function formatRainForecast(item) {
+  const rainLevel =
+    item?.weather?.rain_level ??
+    item?.rain_level ??
+    announcementData?.weather?.rain_level;
+  const rainPercent = percentValue(rainLevel);
+  return rainPercent !== null ? tf("weatherRain", { value: rainPercent }) : t("unknownValue");
+}
+function formatScheduleDateTime(item) {
+  const startTime = getLocalizedField(item, "start_time_local", item?.start_time_local || "--");
+  const timezone = getLocalizedField(item, "timezone", item?.timezone || "UTC+3");
+  return `${formatDate(item?.date)} · ${startTime} ${timezone}`;
+}
+function buildScheduleModalSummary(item) {
+  return `
+    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("labelTrack"))}</div><div class="race-summary-value">${escapeHtml(getLocalizedField(item, "track_name", item?.track_name || "--"))}</div></div>
+    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("scheduleModalDateTime"))}</div><div class="race-summary-value">${escapeHtml(formatScheduleDateTime(item))}</div></div>
+    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("scheduleModalSlot"))}</div><div class="race-summary-value">${escapeHtml(getLocalizedField(item, "slot_label", item?.slot_label || "--"))}</div></div>
+    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("scheduleModalRain"))}</div><div class="race-summary-value">${escapeHtml(formatRainForecast(item))}</div></div>
+  `;
+}
+function buildScheduleModalDetails(item) {
+  const server = announcementData?.server || {};
+  const session = announcementData?.session || {};
+  const rules = announcementData?.rules || {};
+  const weather = item?.weather || announcementData?.weather || {};
+  return `
+    <article class="schedule-detail-card schedule-detail-card-strong">
+      <div class="schedule-detail-label">${escapeHtml(t("heroServerLabel"))}</div>
+      <div class="schedule-detail-value">${escapeHtml(server.name || server.full_name || t("unknownValue"))}</div>
+    </article>
+    <article class="schedule-detail-card schedule-detail-card-strong">
+      <div class="schedule-detail-label">${escapeHtml(t("heroPasswordLabel"))}</div>
+      <div class="schedule-detail-value">${escapeHtml(server.password || t("passwordNone"))}</div>
+    </article>
+    <article class="schedule-detail-card">
+      <div class="schedule-detail-label">${escapeHtml(t("heroEntryLabel"))}</div>
+      <div class="schedule-detail-copy">${escapeHtml(buildEntryRules(server))}</div>
+    </article>
+    <article class="schedule-detail-card">
+      <div class="schedule-detail-label">${escapeHtml(t("heroFormatLabel"))}</div>
+      <div class="schedule-detail-copy">${escapeHtml(buildRaceFormat(session))}</div>
+    </article>
+    <article class="schedule-detail-card">
+      <div class="schedule-detail-label">${escapeHtml(t("heroPitstopLabel"))}</div>
+      <div class="schedule-detail-copy">${escapeHtml(buildPitstopRules(rules))}</div>
+    </article>
+    <article class="schedule-detail-card">
+      <div class="schedule-detail-label">${escapeHtml(t("heroMandatoryLabel"))}</div>
+      <div class="schedule-detail-copy">${escapeHtml(buildMandatoryActions(rules))}</div>
+    </article>
+    <article class="schedule-detail-card schedule-detail-card-weather">
+      <div class="schedule-detail-label">${escapeHtml(t("heroWeatherLabel"))}</div>
+      <div class="schedule-detail-value">${escapeHtml(buildWeatherSummary(weather))}</div>
+    </article>
+  `;
 }
 async function loadJson(url) {
   const response = await fetch(url, { cache: "no-store" });
@@ -378,6 +453,28 @@ function renderSchedule(rows) {
     </article>
   `).join("");
 }
+function renderScheduleTable(rows) {
+  const container = document.getElementById("schedule-list");
+  if (!container) return;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    container.innerHTML = `<div class="empty">${escapeHtml(t("scheduleEmpty"))}</div>`;
+    return;
+  }
+  const headers = t("scheduleCols").map(label => `<th>${escapeHtml(label)}</th>`).join("");
+  const rowsHtml = rows.map((row, index) => `
+    <tr class="is-interactive-row" data-schedule-index="${index}" tabindex="0" role="button" aria-label="${escapeHtml(`${t("openScheduleDetailsLabel")}: ${row.track_name || row.track_code || "-"}`)}">
+      <td>${escapeHtml(formatScheduleDateTime(row))}</td>
+      <td><span class="race-track-name">${escapeHtml(getLocalizedField(row, "track_name", row.track_name || "--"))}</span></td>
+      <td>${escapeHtml(formatRainForecast(row))}</td>
+    </tr>
+  `).join("");
+  container.innerHTML = `<table class="schedule-table"><thead><tr>${headers}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  container.querySelectorAll("tbody tr[data-schedule-index]").forEach(row => {
+    const openRow = () => openScheduleModal(scheduleItems[Number(row.dataset.scheduleIndex)] || null);
+    row.addEventListener("click", event => { if (!event.target.closest("a")) openRow(); });
+    row.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRow(); } });
+  });
+}
 function renderRecentRaces(rows) {
   const container = document.getElementById("recent-races-table");
   if (!container) return;
@@ -439,6 +536,24 @@ function renderRaceResultsModal() {
   `).join("");
   tableEl.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
 }
+function renderScheduleModal() {
+  const titleEl = document.getElementById("schedule-modal-title");
+  const subtitleEl = document.getElementById("schedule-modal-subtitle");
+  const summaryEl = document.getElementById("schedule-modal-summary");
+  const detailsEl = document.getElementById("schedule-modal-details");
+  if (!titleEl || !subtitleEl || !summaryEl || !detailsEl) return;
+  if (!selectedScheduleItem) {
+    titleEl.textContent = "-";
+    subtitleEl.textContent = "-";
+    summaryEl.innerHTML = "";
+    detailsEl.innerHTML = `<div class="empty">${escapeHtml(t("scheduleEmpty"))}</div>`;
+    return;
+  }
+  titleEl.textContent = getLocalizedField(selectedScheduleItem, "track_name", selectedScheduleItem.track_name || "--");
+  subtitleEl.textContent = formatScheduleDateTime(selectedScheduleItem);
+  summaryEl.innerHTML = buildScheduleModalSummary(selectedScheduleItem);
+  detailsEl.innerHTML = buildScheduleModalDetails(selectedScheduleItem);
+}
 function openModal() {
   const modal = document.getElementById("race-results-modal");
   if (!modal) return;
@@ -447,6 +562,15 @@ function openModal() {
   document.body.classList.add("modal-open");
   renderRaceResultsModal();
 }
+function openScheduleModal(item) {
+  const modal = document.getElementById("schedule-modal");
+  if (!modal || !item) return;
+  selectedScheduleItem = item;
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  renderScheduleModal();
+}
 function closeModal() {
   const modal = document.getElementById("race-results-modal");
   if (!modal) return;
@@ -454,6 +578,14 @@ function closeModal() {
   modal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("modal-open");
   selectedRace = null;
+}
+function closeScheduleModal() {
+  const modal = document.getElementById("schedule-modal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  selectedScheduleItem = null;
 }
 async function loadRaceDetails(race) {
   if (!race?.details_path) return race;
@@ -481,6 +613,14 @@ async function openRaceResultsModal(race) {
     console.error(error);
   }
 }
+function bindScheduleModal() {
+  const modal = document.getElementById("schedule-modal");
+  const closeButton = document.getElementById("schedule-modal-close");
+  if (closeButton) closeButton.addEventListener("click", closeScheduleModal);
+  if (modal) {
+    modal.addEventListener("click", event => { if (event.target === modal) closeScheduleModal(); });
+  }
+}
 function bindRaceModal() {
   const modal = document.getElementById("race-results-modal");
   const closeButton = document.getElementById("race-results-close");
@@ -489,7 +629,9 @@ function bindRaceModal() {
     modal.addEventListener("click", event => { if (event.target === modal) closeModal(); });
   }
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && document.getElementById("race-results-modal")?.classList.contains("is-open")) closeModal();
+    if (event.key !== "Escape") return;
+    if (document.getElementById("schedule-modal")?.classList.contains("is-open")) closeScheduleModal();
+    if (document.getElementById("race-results-modal")?.classList.contains("is-open")) closeModal();
   });
 }
 function renderErrorState() {
@@ -517,8 +659,9 @@ function renderUI() {
   }
   renderAnnouncement(announcementData || {});
   renderHeroDetails(announcementData || {});
-  renderSchedule(scheduleItems);
+  renderScheduleTable(scheduleItems);
   renderRecentRaces(recentRaceItems);
+  renderScheduleModal();
   renderRaceResultsModal();
 }
 function bindLanguageButtons() {
@@ -535,6 +678,7 @@ function bindLanguageButtons() {
 async function init() {
   currentLang = resolveInitialLanguage();
   bindLanguageButtons();
+  bindScheduleModal();
   bindRaceModal();
   renderUI();
   try {

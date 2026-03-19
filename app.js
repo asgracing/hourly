@@ -8,6 +8,13 @@ const translations = {
     pageTitle: "Hourly Race | ASG Racing",
     metaDescription:
       "Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server.",
+    ogTitle: "Hourly Race | ASG Racing",
+    ogDescription:
+      "Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server.",
+    twitterTitle: "Hourly Race | ASG Racing",
+    twitterDescription:
+      "Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server.",
+    ogLocale: "en_US",
     navLeaderboard: "Leaderboard",
     navLastRaces: "Last Races",
     navCars: "Cars",
@@ -36,6 +43,13 @@ const translations = {
     pageTitle: "Часовая гонка | ASG Racing",
     metaDescription:
       "Расписание, ближайший анонс и последние заезды отдельного сервера ASG Racing для часовых гонок.",
+    ogTitle: "Часовая гонка | ASG Racing",
+    ogDescription:
+      "Расписание, ближайший анонс и последние заезды отдельного сервера ASG Racing для часовых гонок.",
+    twitterTitle: "Часовая гонка | ASG Racing",
+    twitterDescription:
+      "Расписание, ближайший анонс и последние заезды отдельного сервера ASG Racing для часовых гонок.",
+    ogLocale: "ru_RU",
     navLeaderboard: "Лидерборд",
     navLastRaces: "Последние гонки",
     navCars: "Машины",
@@ -188,8 +202,29 @@ function applyTranslations() {
   document.title = t("pageTitle");
 
   const descriptionMeta = document.querySelector('meta[name="description"]');
+  const ogTitleMeta = document.querySelector('meta[property="og:title"]');
+  const ogDescriptionMeta = document.querySelector('meta[property="og:description"]');
+  const ogLocaleMeta = document.querySelector('meta[property="og:locale"]');
+  const twitterTitleMeta = document.querySelector('meta[name="twitter:title"]');
+  const twitterDescriptionMeta = document.querySelector('meta[name="twitter:description"]');
+
   if (descriptionMeta) {
     descriptionMeta.setAttribute("content", t("metaDescription"));
+  }
+  if (ogTitleMeta) {
+    ogTitleMeta.setAttribute("content", t("ogTitle"));
+  }
+  if (ogDescriptionMeta) {
+    ogDescriptionMeta.setAttribute("content", t("ogDescription"));
+  }
+  if (ogLocaleMeta) {
+    ogLocaleMeta.setAttribute("content", t("ogLocale"));
+  }
+  if (twitterTitleMeta) {
+    twitterTitleMeta.setAttribute("content", t("twitterTitle"));
+  }
+  if (twitterDescriptionMeta) {
+    twitterDescriptionMeta.setAttribute("content", t("twitterDescription"));
   }
 
   document.querySelectorAll("[data-i18n]").forEach(el => {

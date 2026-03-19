@@ -75,13 +75,42 @@
     <section class="hero" id="hourly-home">
       <div class="hero-card">
         <div class="hero-grid">
-          <div class="hero-copy">
-            <div class="eyebrow">ASG Racing</div>
-            <h1 data-i18n="heroTitle">Hourly Race</h1>
-            <p class="hero-subtitle" data-i18n="heroSubtitle">
-              Dedicated ASG Racing server with a fixed schedule, rotating tracks, and a live announcement for the next event.
-            </p>
-          </div>
+          <section class="hero-server-card">
+            <div class="hero-server-grid hero-server-grid-major">
+              <div class="hero-server-item hero-server-item-emphasis">
+                <div class="label" data-i18n="heroServerLabel">Server</div>
+                <div class="value" id="hero-server-name">--</div>
+              </div>
+              <div class="hero-server-item hero-server-item-emphasis">
+                <div class="label" data-i18n="heroPasswordLabel">Password</div>
+                <div class="value" id="hero-server-password">--</div>
+              </div>
+            </div>
+
+            <div class="hero-server-grid hero-server-grid-minor">
+              <div class="hero-server-item">
+                <div class="label" data-i18n="heroEntryLabel">Entry</div>
+                <div class="value" id="hero-entry-rules">--</div>
+              </div>
+              <div class="hero-server-item">
+                <div class="label" data-i18n="heroFormatLabel">Format</div>
+                <div class="value" id="hero-race-format">--</div>
+              </div>
+            </div>
+
+            <div class="hero-server-stack">
+              <div class="hero-server-grid hero-server-grid-rules">
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="heroPitstopLabel">Pitstop</div>
+                  <div class="value" id="hero-pitstop-rules">--</div>
+                </div>
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="heroMandatoryLabel">Mandatory</div>
+                  <div class="value" id="hero-mandatory-actions">--</div>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <aside class="hero-announcement-card" id="announcement">
             <div class="hero-announcement-head">
@@ -109,6 +138,11 @@
                 <div class="label" data-i18n="labelWindow">Server Window</div>
                 <div class="value" id="announcement-duration">--</div>
               </div>
+            </div>
+
+            <div class="hero-announcement-weather">
+              <div class="label" data-i18n="heroWeatherLabel">Weather</div>
+              <div class="value" id="hero-weather">--</div>
             </div>
           </aside>
         </div>

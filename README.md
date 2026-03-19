@@ -14,6 +14,11 @@ Planned runtime environment:
 - launch slots: `14:00` and `20:00`
 - server uptime per slot: `2 hours`
 
+Recommended config paths in `schedule_config.json`:
+- `event_config_path`: `cfg\\event.json`
+- `event_rules_path`: `cfg\\eventRules.json`
+- `settings_path`: `cfg\\settings.json`
+
 Repository layout:
 - `index.html`, `app.js`, `styles.css` - public hourly page
 - `../hourly-data/announcement.json` - next scheduled race for the main site and hourly page

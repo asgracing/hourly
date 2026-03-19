@@ -22,6 +22,13 @@ const translations = {
     heroTitle: "Hourly Race",
     heroSubtitle:
       "Dedicated ASG Racing server with a fixed schedule, rotating tracks, and a live announcement for the next event.",
+    heroServerLabel: "Server",
+    heroPasswordLabel: "Password",
+    heroEntryLabel: "Entry",
+    heroFormatLabel: "Format",
+    heroPitstopLabel: "Pitstop",
+    heroMandatoryLabel: "Mandatory",
+    heroWeatherLabel: "Weather",
     announcementEyebrow: "Next Event",
     scheduleEyebrow: "Schedule",
     archiveEyebrow: "Archive",
@@ -36,7 +43,33 @@ const translations = {
     defaultAnnouncementTitle: "Hourly Race",
     scheduleEmpty: "No data.",
     recentEmpty: "No completed races yet.",
-    locale: "en-US"
+    locale: "en-US",
+    entrySlots: "{value} slots",
+    entrySafety: "SA {value}+",
+    entryTrackMedals: "Track medals {value}",
+    entryRacecraft: "RC {value}+",
+    preRaceWait: "Prestart {value}m",
+    overtime: "Overtime {value}m",
+    mandatoryPitstopCount: "{value} mandatory stop",
+    mandatoryPitstopCountPlural: "{value} mandatory stops",
+    pitWindow: "window {value}m",
+    pitNoMandatory: "No mandatory stop",
+    pitRefuelAllowed: "refuelling allowed",
+    pitRefuelFixed: "fixed refuel time",
+    mandatoryRefuel: "refuel",
+    mandatoryTyres: "tyre change",
+    mandatoryDriverSwap: "driver swap",
+    mandatoryNone: "No mandatory service actions",
+    passwordNone: "No password",
+    weatherClear: "Clear",
+    weatherMixed: "Mixed clouds",
+    weatherCloudy: "Cloudy",
+    weatherWet: "Wet risk",
+    weatherTemp: "{value}C",
+    weatherClouds: "clouds {value}%",
+    weatherRain: "rain {value}%",
+    weatherRandomness: "randomness {value}",
+    unknownValue: "--"
   },
   ru: {
     htmlLang: "ru",
@@ -57,6 +90,13 @@ const translations = {
     heroTitle: "Часовая гонка",
     heroSubtitle:
       "Отдельный сервер ASG Racing с фиксированным расписанием, ротацией трасс и живым анонсом ближайшего события.",
+    heroServerLabel: "Сервер",
+    heroPasswordLabel: "Пароль",
+    heroEntryLabel: "Вход",
+    heroFormatLabel: "Формат",
+    heroPitstopLabel: "Пит-стоп",
+    heroMandatoryLabel: "Обязательно",
+    heroWeatherLabel: "Погода",
     announcementEyebrow: "Ближайший старт",
     scheduleEyebrow: "План",
     archiveEyebrow: "Архив",
@@ -71,7 +111,33 @@ const translations = {
     defaultAnnouncementTitle: "Часовая гонка",
     scheduleEmpty: "Нет данных.",
     recentEmpty: "Пока нет завершенных заездов.",
-    locale: "ru-RU"
+    locale: "ru-RU",
+    entrySlots: "{value} слотов",
+    entrySafety: "SA {value}+",
+    entryTrackMedals: "Медали трассы {value}",
+    entryRacecraft: "RC {value}+",
+    preRaceWait: "Престарт {value}м",
+    overtime: "Овертайм {value}м",
+    mandatoryPitstopCount: "{value} обязательный пит-стоп",
+    mandatoryPitstopCountPlural: "{value} обязательных пит-стопа",
+    pitWindow: "окно {value}м",
+    pitNoMandatory: "Без обязательного пит-стопа",
+    pitRefuelAllowed: "дозаправка разрешена",
+    pitRefuelFixed: "фиксированное время дозаправки",
+    mandatoryRefuel: "дозаправка",
+    mandatoryTyres: "смена шин",
+    mandatoryDriverSwap: "смена пилота",
+    mandatoryNone: "Нет обязательных сервисных действий",
+    passwordNone: "Без пароля",
+    weatherClear: "Ясно",
+    weatherMixed: "Переменная облачность",
+    weatherCloudy: "Облачно",
+    weatherWet: "Есть риск дождя",
+    weatherTemp: "{value}C",
+    weatherClouds: "облачность {value}%",
+    weatherRain: "дождь {value}%",
+    weatherRandomness: "рандомность {value}",
+    unknownValue: "--"
   }
 };
 
@@ -114,6 +180,14 @@ let hasLoadError = false;
 
 function t(key) {
   return translations[currentLang]?.[key] ?? translations.en[key] ?? key;
+}
+
+function tf(key, replacements = {}) {
+  let value = t(key);
+  Object.entries(replacements).forEach(([replacementKey, replacementValue]) => {
+    value = value.replace(`{${replacementKey}}`, String(replacementValue));
+  });
+  return value;
 }
 
 function resolveInitialLanguage() {
@@ -174,6 +248,128 @@ function getLocalizedField(item, key, fallback = "--") {
   return fallback;
 }
 
+function setText(id, value) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  element.textContent = value || t("unknownValue");
+}
+
+function compactJoin(parts) {
+  return parts.filter(Boolean).join(" · ");
+}
+
+function minutesFromSeconds(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  return Math.round(value / 60);
+}
+
+function percentValue(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  return Math.round(value * 100);
+}
+
+function formatMandatoryPitstopCount(value) {
+  if (typeof value !== "number" || value <= 0) return t("pitNoMandatory");
+  if (value === 1) return tf("mandatoryPitstopCount", { value });
+  return tf("mandatoryPitstopCountPlural", { value });
+}
+
+function buildEntryRules(server) {
+  if (!server || typeof server !== "object") return t("unknownValue");
+
+  const parts = [];
+  if (server.car_group) parts.push(server.car_group);
+  if (typeof server.max_car_slots === "number" && server.max_car_slots > 0) {
+    parts.push(tf("entrySlots", { value: server.max_car_slots }));
+  }
+  if (typeof server.safety_rating_requirement === "number" && server.safety_rating_requirement > 0) {
+    parts.push(tf("entrySafety", { value: server.safety_rating_requirement }));
+  }
+  if (typeof server.track_medals_requirement === "number" && server.track_medals_requirement > 0) {
+    parts.push(tf("entryTrackMedals", { value: server.track_medals_requirement }));
+  }
+  if (typeof server.racecraft_rating_requirement === "number" && server.racecraft_rating_requirement > 0) {
+    parts.push(tf("entryRacecraft", { value: server.racecraft_rating_requirement }));
+  }
+
+  return compactJoin(parts) || t("unknownValue");
+}
+
+function buildRaceFormat(session) {
+  if (!session || typeof session !== "object") return t("unknownValue");
+
+  const parts = [];
+  if (session.format_label) parts.push(session.format_label);
+
+  const preRaceMinutes = minutesFromSeconds(session.pre_race_waiting_time_seconds);
+  if (preRaceMinutes && preRaceMinutes > 0) {
+    parts.push(tf("preRaceWait", { value: preRaceMinutes }));
+  }
+
+  const overtimeMinutes = minutesFromSeconds(session.session_over_time_seconds);
+  if (overtimeMinutes && overtimeMinutes > 0) {
+    parts.push(tf("overtime", { value: overtimeMinutes }));
+  }
+
+  return compactJoin(parts) || t("unknownValue");
+}
+
+function buildPitstopRules(rules) {
+  if (!rules || typeof rules !== "object") return t("unknownValue");
+
+  const parts = [formatMandatoryPitstopCount(rules.mandatory_pitstop_count)];
+
+  if (typeof rules.pit_window_length_minutes === "number" && rules.pit_window_length_minutes > 0) {
+    parts.push(tf("pitWindow", { value: rules.pit_window_length_minutes }));
+  }
+  if (rules.refuelling_allowed_in_race) {
+    parts.push(t("pitRefuelAllowed"));
+  }
+  if (rules.refuelling_time_fixed) {
+    parts.push(t("pitRefuelFixed"));
+  }
+
+  return compactJoin(parts) || t("unknownValue");
+}
+
+function buildMandatoryActions(rules) {
+  if (!rules || typeof rules !== "object") return t("unknownValue");
+
+  const actions = [];
+  if (rules.mandatory_pitstop_refuelling_required) actions.push(t("mandatoryRefuel"));
+  if (rules.mandatory_pitstop_tyre_change_required) actions.push(t("mandatoryTyres"));
+  if (rules.mandatory_pitstop_swap_driver_required) actions.push(t("mandatoryDriverSwap"));
+
+  return compactJoin(actions) || t("mandatoryNone");
+}
+
+function buildWeatherSummary(weather) {
+  if (!weather || typeof weather !== "object") return t("unknownValue");
+
+  const summaryKey = weather.summary_key ? `weather${weather.summary_key[0].toUpperCase()}${weather.summary_key.slice(1)}` : null;
+  const parts = [summaryKey ? t(summaryKey) : null];
+
+  if (typeof weather.ambient_temp_c === "number") {
+    parts.push(tf("weatherTemp", { value: weather.ambient_temp_c }));
+  }
+
+  const cloudPercent = percentValue(weather.cloud_level);
+  if (cloudPercent !== null) {
+    parts.push(tf("weatherClouds", { value: cloudPercent }));
+  }
+
+  const rainPercent = percentValue(weather.rain_level);
+  if (rainPercent !== null) {
+    parts.push(tf("weatherRain", { value: rainPercent }));
+  }
+
+  if (typeof weather.weather_randomness === "number") {
+    parts.push(tf("weatherRandomness", { value: weather.weather_randomness }));
+  }
+
+  return compactJoin(parts) || t("unknownValue");
+}
+
 async function loadJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -208,24 +404,12 @@ function applyTranslations() {
   const twitterTitleMeta = document.querySelector('meta[name="twitter:title"]');
   const twitterDescriptionMeta = document.querySelector('meta[name="twitter:description"]');
 
-  if (descriptionMeta) {
-    descriptionMeta.setAttribute("content", t("metaDescription"));
-  }
-  if (ogTitleMeta) {
-    ogTitleMeta.setAttribute("content", t("ogTitle"));
-  }
-  if (ogDescriptionMeta) {
-    ogDescriptionMeta.setAttribute("content", t("ogDescription"));
-  }
-  if (ogLocaleMeta) {
-    ogLocaleMeta.setAttribute("content", t("ogLocale"));
-  }
-  if (twitterTitleMeta) {
-    twitterTitleMeta.setAttribute("content", t("twitterTitle"));
-  }
-  if (twitterDescriptionMeta) {
-    twitterDescriptionMeta.setAttribute("content", t("twitterDescription"));
-  }
+  if (descriptionMeta) descriptionMeta.setAttribute("content", t("metaDescription"));
+  if (ogTitleMeta) ogTitleMeta.setAttribute("content", t("ogTitle"));
+  if (ogDescriptionMeta) ogDescriptionMeta.setAttribute("content", t("ogDescription"));
+  if (ogLocaleMeta) ogLocaleMeta.setAttribute("content", t("ogLocale"));
+  if (twitterTitleMeta) twitterTitleMeta.setAttribute("content", t("twitterTitle"));
+  if (twitterDescriptionMeta) twitterDescriptionMeta.setAttribute("content", t("twitterDescription"));
 
   document.querySelectorAll("[data-i18n]").forEach(el => {
     const key = el.dataset.i18n;
@@ -241,17 +425,27 @@ function applyTranslations() {
 }
 
 function renderAnnouncement(data) {
-  document.getElementById("announcement-title").textContent =
-    getLocalizedField(data, "title", t("defaultAnnouncementTitle"));
-  document.getElementById("announcement-status").textContent =
-    getLocalizedField(data, "status", "--");
-  document.getElementById("announcement-date").textContent = formatDate(data.date);
-  document.getElementById("announcement-time").textContent =
-    getLocalizedField(data, "start_time_local", data.start_time_local || "--");
-  document.getElementById("announcement-track").textContent =
-    getLocalizedField(data, "track_name", data.track_name || "--");
-  document.getElementById("announcement-duration").textContent =
-    getLocalizedField(data, "server_window", data.server_window || "--");
+  setText("announcement-title", getLocalizedField(data, "title", t("defaultAnnouncementTitle")));
+  setText("announcement-status", getLocalizedField(data, "status", "--"));
+  setText("announcement-date", formatDate(data.date));
+  setText("announcement-time", getLocalizedField(data, "start_time_local", data.start_time_local || "--"));
+  setText("announcement-track", getLocalizedField(data, "track_name", data.track_name || "--"));
+  setText("announcement-duration", getLocalizedField(data, "server_window", data.server_window || "--"));
+}
+
+function renderHeroDetails(data) {
+  const server = data?.server || {};
+  const session = data?.session || {};
+  const rules = data?.rules || {};
+  const weather = data?.weather || {};
+
+  setText("hero-server-name", server.name || server.full_name || t("unknownValue"));
+  setText("hero-server-password", server.password || t("passwordNone"));
+  setText("hero-entry-rules", buildEntryRules(server));
+  setText("hero-race-format", buildRaceFormat(session));
+  setText("hero-pitstop-rules", buildPitstopRules(rules));
+  setText("hero-mandatory-actions", buildMandatoryActions(rules));
+  setText("hero-weather", buildWeatherSummary(weather));
 }
 
 function renderSchedule(rows) {
@@ -293,12 +487,19 @@ function renderRecentRaces(rows) {
 function renderErrorState() {
   document.getElementById("schedule-list").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
   document.getElementById("recent-races-list").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
-  document.getElementById("announcement-title").textContent = t("loadError");
-  document.getElementById("announcement-status").textContent = "--";
-  document.getElementById("announcement-date").textContent = "--";
-  document.getElementById("announcement-time").textContent = "--";
-  document.getElementById("announcement-track").textContent = "--";
-  document.getElementById("announcement-duration").textContent = "--";
+  setText("announcement-title", t("loadError"));
+  setText("announcement-status", "--");
+  setText("announcement-date", "--");
+  setText("announcement-time", "--");
+  setText("announcement-track", "--");
+  setText("announcement-duration", "--");
+  setText("hero-server-name", "--");
+  setText("hero-server-password", "--");
+  setText("hero-entry-rules", "--");
+  setText("hero-race-format", "--");
+  setText("hero-pitstop-rules", "--");
+  setText("hero-mandatory-actions", "--");
+  setText("hero-weather", "--");
 }
 
 function renderUI() {
@@ -310,6 +511,7 @@ function renderUI() {
   }
 
   renderAnnouncement(announcementData || {});
+  renderHeroDetails(announcementData || {});
   renderSchedule(scheduleItems);
   renderRecentRaces(recentRaceItems);
 }

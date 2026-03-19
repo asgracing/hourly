@@ -2,6 +2,7 @@ import json
 import logging
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -117,6 +118,38 @@ def get_run_duration_seconds(schedule_config: dict) -> int:
         server_window_minutes = 120
 
     return server_window_minutes * 60
+
+
+def prompt_with_timeout(prompt_text: str, timeout_seconds: int) -> str | None:
+    if not sys.stdin or not sys.stdin.isatty():
+        return None
+
+    result = {"value": None}
+
+    def read_input():
+        try:
+            result["value"] = input(prompt_text)
+        except EOFError:
+            result["value"] = None
+
+    worker = threading.Thread(target=read_input, daemon=True)
+    worker.start()
+    worker.join(timeout_seconds)
+
+    if worker.is_alive():
+        return None
+
+    return result["value"]
+
+
+def resolve_run_mode(schedule_config: dict) -> tuple[int, str]:
+    default_duration = get_run_duration_seconds(schedule_config)
+    answer = prompt_with_timeout("Is this a test run? Type yes or no within 20 seconds: ", 20)
+
+    if answer and answer.strip().lower() == "yes":
+        return 60, "test"
+
+    return default_duration, "normal"
 
 
 def get_track_key(schedule_config: dict) -> str:
@@ -243,7 +276,7 @@ def main():
         schedule_config = load_json(SCHEDULE_CONFIG_PATH)
         rotation_state = load_json(ROTATION_STATE_PATH)
         runtime_state = load_json(RUNTIME_STATE_PATH)
-        run_duration_seconds = get_run_duration_seconds(schedule_config)
+        run_duration_seconds, run_mode = resolve_run_mode(schedule_config)
 
         selected_track, selected_index = choose_next_track(schedule_config, rotation_state)
         event_config_path = resolve_event_config_path(schedule_config)
@@ -287,6 +320,7 @@ def main():
 
         runtime_state = update_runtime_state_with_process(runtime_state, process)
         save_json(RUNTIME_STATE_PATH, runtime_state)
+        logging.info("Run mode: %s", run_mode)
         logging.info("Run duration: %s seconds", run_duration_seconds)
         logging.info("Waiting for test/full run window to finish.")
 

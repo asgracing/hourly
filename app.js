@@ -1,6 +1,6 @@
-const announcementUrl = "./announcement.json";
-const recentRacesUrl = "./recent_races.json";
-const scheduleUrl = "./schedule.json";
+const announcementUrl = "../hourly-data/announcement.json";
+const recentRacesUrl = "../hourly-data/recent_races.json";
+const scheduleUrl = "../hourly-data/schedule.json";
 
 const translations = {
   en: {

@@ -61,6 +61,14 @@ Suggested workflow:
 3. Point orchestration scripts to the local ACC server config and results folders.
 4. Add Windows Task Scheduler jobs that start the orchestrator at the desired slots.
 
+Slot vote MVP:
+- the public page can show a `I want to race!` vote CTA on upcoming slots
+- frontend reads the Worker base URL from `<meta name="hourly-votes-api" content="...">` in `index.html`
+- if the Worker URL is empty or unavailable, voting stays disabled and the page falls back to a passive `Voting soon` label
+- the Cloudflare Worker source lives in `votes-worker/`
+- the Worker stores votes in GitHub Issues, one issue per slot `event_id`
+- each browser gets a local `voter_id` in `localStorage`, so the same browser can vote only once per slot in the UI flow
+
 Track switching flow:
 1. Orchestrator loads `config/schedule_config.json`.
 2. It chooses the next track using `config/rotation_state.json`.

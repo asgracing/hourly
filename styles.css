@@ -407,6 +407,108 @@ h2 {
   font-weight: 700;
 }
 
+.hero-vote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-vote-actions,
+.schedule-event-vote-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hero-vote-btn,
+.schedule-event-vote-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 209, 102, 0.24);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 107, 44, 0.88), rgba(255, 145, 77, 0.88));
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
+}
+
+.hero-vote-btn:hover:not(:disabled),
+.schedule-event-vote-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.hero-vote-btn:disabled,
+.schedule-event-vote-btn:disabled {
+  cursor: default;
+  opacity: 0.84;
+}
+
+.hero-vote-btn.is-voted,
+.schedule-event-vote-btn.is-voted {
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.92), rgba(255, 157, 77, 0.92));
+  color: #101418;
+}
+
+.hero-vote-icon,
+.schedule-event-vote-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.hero-vote-meta,
+.schedule-event-vote-meta {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #d6e1ef;
+}
+
+.hero-vote-meta {
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.hero-vote-cancel,
+.schedule-event-vote-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255, 107, 107, 0.34);
+  border-radius: 999px;
+  background: rgba(180, 35, 35, 0.92);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
+}
+
+.hero-vote-cancel:hover:not(:disabled),
+.schedule-event-vote-cancel:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.hero-vote-cancel:disabled,
+.schedule-event-vote-cancel:disabled {
+  cursor: default;
+  opacity: 0.84;
+}
+
 .card {
   margin-top: 18px;
   padding: 22px;
@@ -642,6 +744,12 @@ tbody tr:not(.is-interactive-row):hover {
   height: 22px;
   object-fit: contain;
   flex: 0 0 auto;
+}
+
+.schedule-event-vote {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .schedule-table td:first-child {

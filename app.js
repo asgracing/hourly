@@ -2,6 +2,8 @@ const announcementUrl = "https://asgracing.github.io/hourly-data/announcement.js
 const scheduleUrl = "https://asgracing.github.io/hourly-data/schedule.json";
 const recentRacesUrl = "https://asgracing.github.io/hourly-data/races/races.json";
 const recentRaceDetailsBaseUrl = "https://asgracing.github.io/hourly-data/";
+const votesApiBase =
+  document.querySelector('meta[name="hourly-votes-api"]')?.getAttribute("content")?.trim() || "";
 
 const translations = {
   en: {
@@ -35,6 +37,15 @@ const translations = {
     scheduleModalDateTime: "Date & time",
     scheduleModalSlot: "Slot",
     scheduleModalRain: "Rain forecast",
+    voteButton: "I want to race!",
+    voteButtonDone: "You're in",
+    voteCountZero: "No votes yet",
+    voteCountOne: "{value} wants to race",
+    voteCountMany: "{value} want to race",
+    voteSoon: "Voting soon",
+    voteSending: "Saving...",
+    voteFailed: "Try again",
+    unvoteButton: "Remove vote",
     recentTitle: "Recent Races",
     labelDate: "Date",
     labelTime: "Time",
@@ -178,6 +189,18 @@ Object.assign(translations.ru, {
   scheduleModalRain: "Прогноз дождя"
 });
 
+Object.assign(translations.ru, {
+  voteButton: "Я хочу поехать!",
+  voteButtonDone: "Ты в списке",
+  voteCountZero: "Пока никто не отметился",
+  voteCountOne: "{value} хочет поехать",
+  voteCountMany: "{value} хотят поехать",
+  voteSoon: "Опрос скоро",
+  voteSending: "Сохраняем...",
+  voteFailed: "Повтори позже",
+  unvoteButton: "Отменить голос"
+});
+
 let currentLang = "en";
 let announcementData = {};
 let scheduleItems = [];
@@ -185,6 +208,8 @@ let recentRaceItems = [];
 let selectedScheduleItem = null;
 let selectedRace = null;
 let hasLoadError = false;
+let votesEnabled = Boolean(votesApiBase);
+let voteStateByEventId = {};
 const raceDetailsCache = new Map();
 const HERO_TRACK_BACKGROUNDS = {
   monza: "./assets/tracks/monza.jpg",
@@ -192,6 +217,7 @@ const HERO_TRACK_BACKGROUNDS = {
   spa: "./assets/tracks/spa.jpg",
   nurburgring: "./assets/tracks/nurburgring.jpg"
 };
+const pendingVoteEventIds = new Set();
 
 function t(key) { return translations[currentLang]?.[key] ?? translations.en[key] ?? key; }
 function tf(key, replacements = {}) {
@@ -408,6 +434,212 @@ function humanizeTrackName(track) {
   if (!track) return "-";
   return String(track).replace(/[_-]+/g, " ").replace(/\b\w/g, char => char.toUpperCase());
 }
+function normalizeEventId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+function buildSlotEventId(item) {
+  const explicitId = normalizeEventId(item?.event_id);
+  if (explicitId) return explicitId;
+  const date = String(item?.date || "").trim();
+  const time = String(item?.start_time_local || "").trim().replace(":", "");
+  const trackCode = normalizeEventId(item?.track_code || item?.track_name || "slot");
+  return normalizeEventId(`hourly_${date}_${time}_${trackCode}`);
+}
+function getBrowserVoterId() {
+  const storageKey = "hourlyVoteVoterId";
+  let value = localStorage.getItem(storageKey);
+  if (!value) {
+    value = `browser-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(storageKey, value);
+  }
+  return value;
+}
+function getVoteLabel(count) {
+  if (typeof count !== "number" || count <= 0) return t("voteCountZero");
+  return tf(count === 1 ? "voteCountOne" : "voteCountMany", { value: count });
+}
+function getVoteState(item) {
+  const eventId = buildSlotEventId(item);
+  return {
+    eventId,
+    pending: pendingVoteEventIds.has(eventId),
+    ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false })
+  };
+}
+async function loadVotesForSchedule(items) {
+  if (!votesApiBase) {
+    votesEnabled = false;
+    voteStateByEventId = {};
+    return;
+  }
+  const eventIds = items.map(buildSlotEventId).filter(Boolean);
+  if (!eventIds.length) return;
+  try {
+    const url = new URL("/votes", votesApiBase);
+    url.searchParams.set("event_ids", eventIds.join(","));
+    url.searchParams.set("voter_id", getBrowserVoterId());
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload?.items && typeof payload.items === "object") {
+      voteStateByEventId = payload.items;
+      votesEnabled = true;
+    }
+  } catch (error) {
+    console.error(error);
+    votesEnabled = false;
+    voteStateByEventId = {};
+  }
+}
+async function submitVote(item) {
+  if (!votesApiBase) return;
+  const eventId = buildSlotEventId(item);
+  if (!eventId || pendingVoteEventIds.has(eventId) || voteStateByEventId[eventId]?.already_voted) return;
+  pendingVoteEventIds.add(eventId);
+  renderScheduleTable(scheduleItems);
+  try {
+    const response = await fetch(new URL("/vote", votesApiBase), {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        event_id: eventId,
+        track: getLocalizedField(item, "track_name", item?.track_name || item?.track_code || "-"),
+        date: item?.date || "",
+        time: item?.start_time_local || "",
+        voter_id: getBrowserVoterId()
+      })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    voteStateByEventId[eventId] = {
+      event_id: eventId,
+      votes: typeof payload?.votes === "number" ? payload.votes : 0,
+      already_voted: Boolean(payload?.already_voted)
+    };
+  } catch (error) {
+    console.error(error);
+    voteStateByEventId[eventId] = {
+      ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false }),
+      failed: true
+    };
+  } finally {
+    pendingVoteEventIds.delete(eventId);
+    if (selectedScheduleItem && buildSlotEventId(selectedScheduleItem) === eventId) renderScheduleModal();
+    renderScheduleTable(scheduleItems);
+    renderHeroVote();
+  }
+}
+async function submitUnvote(item) {
+  if (!votesApiBase) return;
+  const eventId = buildSlotEventId(item);
+  if (!eventId || pendingVoteEventIds.has(eventId)) return;
+  pendingVoteEventIds.add(eventId);
+  renderScheduleTable(scheduleItems);
+  renderHeroVote();
+  try {
+    const response = await fetch(new URL("/unvote", votesApiBase), {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        event_id: eventId,
+        voter_id: getBrowserVoterId()
+      })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    voteStateByEventId[eventId] = {
+      event_id: eventId,
+      votes: typeof payload?.votes === "number" ? payload.votes : 0,
+      already_voted: Boolean(payload?.already_voted)
+    };
+  } catch (error) {
+    console.error(error);
+    voteStateByEventId[eventId] = {
+      ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false }),
+      failed: true
+    };
+  } finally {
+    pendingVoteEventIds.delete(eventId);
+    if (selectedScheduleItem && buildSlotEventId(selectedScheduleItem) === eventId) renderScheduleModal();
+    renderScheduleTable(scheduleItems);
+    renderHeroVote();
+  }
+}
+function buildVoteControls(item, context = "card") {
+  const voteState = getVoteState(item);
+  const voteCountLabel = voteState.failed
+    ? t("voteFailed")
+    : voteState.pending
+      ? t("voteSending")
+      : votesEnabled
+        ? getVoteLabel(voteState.votes)
+        : t("voteSoon");
+  const baseClass = context === "hero" ? "hero-vote" : "schedule-event-vote";
+  return `
+    <div class="${baseClass}">
+      <div class="${baseClass}-actions">
+        <button
+          class="${baseClass}-btn${voteState.already_voted ? " is-voted" : ""}"
+          type="button"
+          data-vote-event-id="${escapeHtml(voteState.eventId)}"
+          ${(!votesEnabled || voteState.already_voted || voteState.pending) ? "disabled" : ""}
+        >
+          <span>${escapeHtml(voteState.already_voted ? t("voteButtonDone") : t("voteButton"))}</span>
+          <span class="${baseClass}-icon" aria-hidden="true">♥</span>
+        </button>
+        ${
+          voteState.already_voted
+            ? `
+              <button
+                class="${baseClass}-cancel"
+                type="button"
+                data-unvote-event-id="${escapeHtml(voteState.eventId)}"
+                aria-label="${escapeHtml(t("unvoteButton"))}"
+                ${voteState.pending ? "disabled" : ""}
+              >×</button>
+            `
+            : ""
+        }
+      </div>
+      <div class="${baseClass}-meta">${escapeHtml(voteCountLabel)}</div>
+    </div>
+  `;
+}
+function bindVoteControls(root = document) {
+  root.querySelectorAll("[data-vote-event-id]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const eventId = button.dataset.voteEventId;
+      const item = scheduleItems.find(row => buildSlotEventId(row) === eventId);
+      if (item) void submitVote(item);
+    });
+  });
+  root.querySelectorAll("[data-unvote-event-id]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const eventId = button.dataset.unvoteEventId;
+      const item = scheduleItems.find(row => buildSlotEventId(row) === eventId);
+      if (item) void submitUnvote(item);
+    });
+  });
+}
+function renderHeroVote() {
+  const container = document.getElementById("hero-vote");
+  if (!container) return;
+  const firstSlot = scheduleItems[0] || null;
+  if (!firstSlot) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = buildVoteControls(firstSlot, "hero");
+  bindVoteControls(container);
+}
 function applyHeroTrackBackground(trackCode) {
   const heroCard = document.querySelector(".hero-card");
   if (!heroCard) return;
@@ -534,6 +766,7 @@ function renderScheduleTable(rows) {
           <div class="schedule-event-time">${escapeHtml(formatScheduleCardDateTime(row))}</div>
           <div class="schedule-event-track">${escapeHtml(getLocalizedField(row, "track_name", row.track_name || "--"))}</div>
           <div class="schedule-event-weather"><span>${escapeHtml(buildScheduleCardWeather(row))}</span><img src="./assets/weather/rain.png" alt="" /></div>
+          ${buildVoteControls(row, "card")}
         </div>
       </article>
     `;
@@ -544,6 +777,7 @@ function renderScheduleTable(rows) {
     card.addEventListener("click", event => { if (!event.target.closest("a")) openCard(); });
     card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } });
   });
+  bindVoteControls(container);
 }
 function renderRecentRaces(rows) {
   const container = document.getElementById("recent-races-table");
@@ -733,6 +967,7 @@ function renderUI() {
   }
   renderAnnouncement(announcementData || {});
   renderHeroDetails(announcementData || {});
+  renderHeroVote();
   renderScheduleTable(scheduleItems);
   renderRecentRaces(recentRaceItems);
   renderScheduleModal();
@@ -760,6 +995,7 @@ async function init() {
     announcementData = announcement || {};
     scheduleItems = Array.isArray(schedule?.items) ? schedule.items : [];
     recentRaceItems = Array.isArray(recentRaces?.items) ? recentRaces.items : [];
+    await loadVotesForSchedule(scheduleItems.slice(0, 3));
     hasLoadError = false;
     renderUI();
   } catch (error) {

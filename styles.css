@@ -417,6 +417,17 @@ h2 {
   margin-bottom: 18px;
 }
 
+.section-subtitle,
+.modal-subtitle,
+.race-note {
+  color: var(--muted);
+}
+
+.section-subtitle {
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
 .status-pill {
   padding: 8px 12px;
   border-radius: 999px;
@@ -478,6 +489,227 @@ h2 {
   white-space: nowrap;
   color: #ffd7c6;
   font-weight: 700;
+}
+
+.table-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(14, 21, 30, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.table-card-compact {
+  margin-top: 4px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+th {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+td {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.is-interactive-row {
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.is-interactive-row:hover {
+  background: rgba(255, 107, 44, 0.08);
+  transform: translateY(-1px);
+}
+
+.race-track-cell,
+.driver-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.race-track-name,
+.race-winner,
+.driver-name {
+  font-weight: 800;
+}
+
+.race-note {
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 800;
+}
+
+.driver-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.driver-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 107, 44, 0.95), rgba(255, 209, 102, 0.95));
+  color: #101418;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.positions-delta {
+  font-weight: 800;
+}
+
+.delta-positive {
+  color: #39d98a;
+}
+
+.delta-negative {
+  color: #ef4444;
+}
+
+.delta-neutral {
+  color: var(--text);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 10, 16, 0.78);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.modal-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.modal-card {
+  position: relative;
+  width: min(1080px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 184, 77, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 15, 20, 0.98));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+
+.modal-header {
+  margin-bottom: 20px;
+  padding-right: 42px;
+}
+
+.modal-title {
+  margin: 8px 0 6px;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  color: var(--text);
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(1.03);
+}
+
+.race-modal-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.race-summary-card {
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.race-summary-label {
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.race-summary-value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.table-card-modal {
+  border-radius: 18px;
+}
+
+body.modal-open {
+  overflow: hidden;
 }
 
 @media (max-width: 720px) {
@@ -566,6 +798,10 @@ h2 {
 
   .grid.two {
     grid-template-columns: 1fr;
+  }
+
+  .race-modal-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .list-item,

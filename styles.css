@@ -139,6 +139,55 @@ body {
   color: #fff4c7;
 }
 
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(10, 16, 24, 0.78);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 72px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.lang-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.lang-btn.active {
+  background: linear-gradient(135deg, var(--accent), #ff7d57);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(255, 91, 46, 0.25);
+}
+
+.lang-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lang-text {
+  line-height: 1;
+}
+
 .page {
   width: min(980px, calc(100% - 32px));
   margin: 0 auto;
@@ -265,19 +314,24 @@ h2 {
   }
 
   .top-nav-inner {
-    grid-template-columns: auto;
+    grid-template-columns: 1fr auto;
     gap: 10px;
     padding: 10px 12px;
   }
 
-  .top-nav-brand,
-  .top-nav-actions {
+  .top-nav-brand {
     display: none;
   }
 
   .top-nav-center {
     display: block;
     width: 100%;
+    grid-column: 1 / -1;
+    order: 2;
+  }
+
+  .top-nav-actions {
+    order: 1;
   }
 
   .top-nav-menu {
@@ -294,6 +348,11 @@ h2 {
     flex: 0 0 auto;
     padding: 10px 15px;
     font-size: 0.8rem;
+  }
+
+  .lang-btn {
+    min-width: 64px;
+    padding: 0 10px;
   }
 
   .grid.two {

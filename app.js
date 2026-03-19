@@ -35,7 +35,7 @@ const translations = {
     labelWindow: "Server Window",
     loadingShort: "Loading...",
     loadError: "Loading failed.",
-    defaultAnnouncementTitle: "Hourly Race",
+    defaultAnnouncementTitle: "1-Hour Race",
     scheduleEmpty: "No data.",
     recentEmpty: "No completed races yet.",
     locale: "en-GB",
@@ -320,10 +320,32 @@ function applyTranslations() {
 }
 
 function renderAnnouncement(data) {
-  setText("announcement-title", getLocalizedField(data, "title", t("defaultAnnouncementTitle")));
+  const announcementTitle =
+    currentLang === "en"
+      ? getLocalizedField(
+          { title_en: data?.title_en, title: typeof data?.title === "object" ? data.title : undefined },
+          "title",
+          t("defaultAnnouncementTitle")
+        )
+      : getLocalizedField(data, "title", t("defaultAnnouncementTitle"));
+  const announcementTime = getLocalizedField(
+    data,
+    "start_time_local",
+    data.start_time_local || "--"
+  );
+  const announcementTimezone = getLocalizedField(
+    data,
+    "timezone",
+    data.timezone || "UTC+3"
+  );
+
+  setText("announcement-title", announcementTitle);
   setText("announcement-status", getLocalizedField(data, "status", "--"));
   setText("announcement-date", formatDate(data.date));
-  setText("announcement-time", getLocalizedField(data, "start_time_local", data.start_time_local || "--"));
+  setText(
+    "announcement-time",
+    announcementTime === "--" ? announcementTime : `${announcementTime} ${announcementTimezone}`
+  );
   setText("announcement-track", getLocalizedField(data, "track_name", data.track_name || "--"));
   setText("announcement-duration", getLocalizedField(data, "server_window", data.server_window || "--"));
 }

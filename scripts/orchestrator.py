@@ -424,9 +424,13 @@ def main():
         )
         if q_files and r_files:
             logging.info("Hourly orchestrator verified Q and R result files successfully.")
-            publish_git_if_needed(selected_track)
         else:
-            logging.warning("Hourly orchestrator finished with incomplete result files.")
+            logging.warning(
+                "Hourly orchestrator finished with incomplete result files. "
+                "Publishing schedule and announcement updates anyway."
+            )
+
+        publish_git_if_needed(selected_track)
         logging.info("Hourly orchestrator completed successfully.")
     except Exception as exc:
         try:

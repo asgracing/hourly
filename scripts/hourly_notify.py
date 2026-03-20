@@ -53,7 +53,16 @@ def load_votes_summary(votes_api_base, event_id):
     if not votes_api_base or not event_id:
         return {}
     url = f"{votes_api_base.rstrip('/')}/votes?event_ids={parse.quote(event_id)}&voter_id=notify-bot"
-    with request.urlopen(url, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+    req = request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "Origin": SITE_BASE_URL,
+            "User-Agent": "hourly-notifier",
+        },
+        method="GET",
+    )
+    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, dict):
         return {}

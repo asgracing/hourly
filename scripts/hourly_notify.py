@@ -310,6 +310,39 @@ def build_photo_caption(item, trigger_key):
     return "\n".join(lines)
 
 
+def build_discord_payload(item, trigger_key):
+    track_name = str(item.get("track_name") or "Unknown track")
+    date_str = format_display_date(item.get("date"))
+    start_time_local = str(item.get("start_time_local") or "--").strip()
+    timezone_label = str(item.get("timezone") or "UTC").strip()
+    details_url = build_details_url(item)
+    registrations = item.get("registrations")
+    image_url = build_track_image_url(item)
+
+    fields = [
+        {"name": "Track", "value": track_name, "inline": True},
+        {"name": "Date", "value": date_str, "inline": True},
+        {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
+    ]
+    if registrations not in (None, ""):
+        fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
+
+    embed = {
+        "title": build_notification_title(item, trigger_key),
+        "description": build_hype_line(trigger_key),
+        "url": details_url,
+        "color": 16748032,
+        "fields": fields,
+    }
+    if image_url:
+        embed["image"] = {"url": image_url}
+
+    return {
+        "content": "🏁 ASG Racing hourly alert",
+        "embeds": [embed],
+    }
+
+
 def send_telegram_message(message):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
@@ -351,20 +384,52 @@ def send_telegram_photo(caption, image_url):
     return True
 
 
+def send_discord_message(payload):
+    webhook_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        return False
+
+    body = json.dumps(payload).encode("utf-8")
+    req = request.Request(
+        webhook_url,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "hourly-notifier",
+        },
+        method="POST",
+    )
+    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+        response.read()
+    return True
+
+
 def dispatch(item, trigger_key):
+    telegram_sent = False
+    discord_sent = False
+
     track_image_url = build_track_image_url(item)
     if track_image_url:
         try:
-            if send_telegram_photo(build_photo_caption(item, trigger_key), track_image_url):
-                return
+            telegram_sent = send_telegram_photo(build_photo_caption(item, trigger_key), track_image_url)
         except error.HTTPError as exc:
             print(f"telegram photo failed: {exc.code} {exc.reason}; fallback to text")
         except Exception as exc:
             print(f"telegram photo failed: {exc}; fallback to text")
 
-    if send_telegram_message(build_plain_message(item, trigger_key)):
+    if not telegram_sent:
+        telegram_sent = send_telegram_message(build_plain_message(item, trigger_key))
+
+    try:
+        discord_sent = send_discord_message(build_discord_payload(item, trigger_key))
+    except error.HTTPError as exc:
+        print(f"discord webhook failed: {exc.code} {exc.reason}; continue without Discord")
+    except Exception as exc:
+        print(f"discord webhook failed: {exc}; continue without Discord")
+
+    if telegram_sent or discord_sent:
         return
-    raise RuntimeError("Telegram is not configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.")
+    raise RuntimeError("No delivery target is configured. Set Telegram and/or Discord credentials.")
 
 
 def cleanup_state(state, active_event_id):
@@ -413,6 +478,7 @@ def run():
 
     if votes_summary and "votes" in votes_summary:
         announcement["registrations"] = votes_summary.get("votes")
+
     now = datetime.now(event_start.tzinfo or timezone.utc)
     time_until_start = event_start - now
 

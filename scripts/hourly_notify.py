@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
+DEFAULT_FINAL_WINDOW_MINUTES = 3
 DEFAULT_TIMEOUT_SECONDS = 20
 
 
@@ -120,20 +121,32 @@ def parse_event_start(item):
     return datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=tzinfo)
 
 
-def build_windows(window_minutes):
-    tolerance = timedelta(minutes=window_minutes)
+def build_windows(window_minutes, final_window_minutes):
+    standard_tolerance = timedelta(minutes=window_minutes)
+    final_tolerance = timedelta(minutes=final_window_minutes)
     return {
-        "24h": timedelta(hours=24),
-        "4h": timedelta(hours=4),
-    }, tolerance
+        "24h": {"delta": timedelta(hours=24), "tolerance": standard_tolerance},
+        "4h": {"delta": timedelta(hours=4), "tolerance": standard_tolerance},
+        "5m": {"delta": timedelta(minutes=5), "tolerance": final_tolerance},
+    }
 
 
 def is_due(time_until_start, target_delta, tolerance):
     return target_delta - tolerance <= time_until_start <= target_delta + tolerance
 
 
+def get_trigger_label(trigger_key):
+    if trigger_key == "24h":
+        return "24 hours"
+    if trigger_key == "4h":
+        return "4 hours"
+    if trigger_key == "5m":
+        return "5 minutes"
+    return "test"
+
+
 def format_message(item, trigger_key, event_start):
-    lead = "24 hours" if trigger_key == "24h" else "4 hours"
+    lead = get_trigger_label(trigger_key)
     track_name = item.get("track_name") or "Unknown track"
     start_time_local = str(item.get("start_time_local") or "--").strip()
     timezone_label = str(item.get("timezone") or "UTC").strip()
@@ -163,6 +176,19 @@ def format_message(item, trigger_key, event_start):
     lines.append(f"Event ID: {build_event_id(item)}")
     lines.append(f"Starts at: {event_start.isoformat()}")
     return "\n".join(lines)
+
+
+def format_test_message(item, event_start):
+    return "\n".join(
+        [
+            "[TEST] ASG Racing hourly notifier check.",
+            f"Track: {item.get('track_name') or 'Unknown track'}",
+            f"Date: {str(item.get('date') or '--').strip()}",
+            f"Start: {str(item.get('start_time_local') or '--').strip()} {str(item.get('timezone') or 'UTC').strip()}".strip(),
+            f"Event ID: {build_event_id(item)}",
+            f"Starts at: {event_start.isoformat()}",
+        ]
+    )
 
 
 def send_telegram_message(message):
@@ -224,6 +250,10 @@ def run():
     state_file = Path(read_env("HOURLY_NOTIFY_STATE_FILE", str(DEFAULT_STATE_FILE))).resolve()
     dry_run = os.getenv("HOURLY_NOTIFY_DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
     window_minutes = int(read_env("HOURLY_NOTIFY_WINDOW_MINUTES", str(DEFAULT_WINDOW_MINUTES)))
+    final_window_minutes = int(
+        read_env("HOURLY_NOTIFY_FINAL_WINDOW_MINUTES", str(DEFAULT_FINAL_WINDOW_MINUTES))
+    )
+    force_send = os.getenv("HOURLY_NOTIFY_FORCE_SEND", "").strip().lower() in {"1", "true", "yes"}
 
     announcement = load_remote_json(announcement_url)
     if not isinstance(announcement, dict):
@@ -237,15 +267,28 @@ def run():
     now = datetime.now(event_start.tzinfo or timezone.utc)
     time_until_start = event_start - now
 
-    triggers, tolerance = build_windows(window_minutes)
     state = load_state(state_file)
     event_state = state["events"].setdefault(event_id, {"sent": {}})
     sent_now = []
 
-    for trigger_key, target_delta in triggers.items():
+    if force_send:
+        message = format_test_message(announcement, event_start)
+        if dry_run:
+            print(f"[dry-run] would send test notification for {event_id}")
+            print(message)
+        else:
+            dispatch(message)
+            print(f"test notification sent for {event_id}")
+        state["last_event_id"] = event_id
+        cleanup_state(state, event_id)
+        save_state(state_file, state)
+        return
+
+    triggers = build_windows(window_minutes, final_window_minutes)
+    for trigger_key, trigger_config in triggers.items():
         if event_state["sent"].get(trigger_key):
             continue
-        if not is_due(time_until_start, target_delta, tolerance):
+        if not is_due(time_until_start, trigger_config["delta"], trigger_config["tolerance"]):
             continue
 
         message = format_message(announcement, trigger_key, event_start)

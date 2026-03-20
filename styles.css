@@ -410,15 +410,14 @@ h2 {
 .hero-vote {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: center;
+  gap: 30px;
   flex-wrap: wrap;
   margin-top: 4px;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
-  background: rgba(8, 12, 18, 0.24);
-  backdrop-filter: blur(8px);
+  background: rgba(8, 12, 18, 0.5);
 }
 
 .hero-vote-actions,

@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from html import escape
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib import error, parse, request
@@ -12,6 +13,9 @@ DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
 DEFAULT_FINAL_WINDOW_MINUTES = 3
 DEFAULT_TIMEOUT_SECONDS = 20
+SITE_BASE_URL = "https://asgracing.github.io"
+HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
+TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
 
 
 def normalize_event_id(value):
@@ -39,6 +43,27 @@ def build_event_id(item):
     time_str = str(item.get("start_time_local") or "").strip().replace(":", "")
     track_code = normalize_event_id(item.get("track_code") or item.get("track_name") or "slot")
     return normalize_event_id(f"hourly_{date_str}_{time_str}_{track_code}")
+
+
+def build_details_url(item):
+    details_url = str(item.get("details_url") or "").strip()
+    if not details_url:
+        return HOURLY_PAGE_URL
+    if details_url.startswith("http://") or details_url.startswith("https://"):
+        return details_url
+    if details_url.startswith("/"):
+        return f"{SITE_BASE_URL}{details_url}"
+    return f"{HOURLY_PAGE_URL}{details_url.lstrip('./')}"
+
+
+def build_track_image_url(item):
+    track_code = normalize_event_id(item.get("track_code") or item.get("track_name"))
+    if not track_code:
+        return ""
+    supported = {"spa", "monza", "silverstone", "nurburgring"}
+    if track_code not in supported:
+        return ""
+    return f"{TRACK_IMAGE_BASE_URL}/{track_code}.jpg"
 
 
 def load_remote_json(url):
@@ -145,17 +170,38 @@ def get_trigger_label(trigger_key):
     return "test"
 
 
-def format_message(item, trigger_key, event_start):
+def build_notification_title(item, trigger_key):
+    lead = get_trigger_label(trigger_key)
+    track_name = item.get("track_name") or "Unknown track"
+    if trigger_key == "5m":
+        return f"Last call for {track_name} in {lead}"
+    if trigger_key == "test":
+        return f"ASG Racing test alert for {track_name}"
+    return f"{track_name} starts in {lead}"
+
+
+def build_hype_line(trigger_key):
+    if trigger_key == "24h":
+        return "Lock in your plan, warm up, and get ready for the next hourly battle."
+    if trigger_key == "4h":
+        return "Time to pick the setup, check the fuel, and get on the grid."
+    if trigger_key == "5m":
+        return "Server is about to go live. Join now if you want to make the start."
+    return "Quick delivery check for the hourly notifier."
+
+
+def build_plain_message(item, trigger_key, event_start):
     lead = get_trigger_label(trigger_key)
     track_name = item.get("track_name") or "Unknown track"
     start_time_local = str(item.get("start_time_local") or "--").strip()
     timezone_label = str(item.get("timezone") or "UTC").strip()
     date_str = str(item.get("date") or "--").strip()
-    details_url = str(item.get("details_url") or "").strip()
     registrations = item.get("registrations") or item.get("votes")
+    details_url = build_details_url(item)
 
     lines = [
-        f"ASG Racing hourly event starts in {lead}.",
+        f"{build_notification_title(item, trigger_key)}",
+        build_hype_line(trigger_key),
         f"Track: {track_name}",
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
@@ -168,27 +214,85 @@ def format_message(item, trigger_key, event_start):
     if description:
         lines.append(description)
 
-    if details_url:
-        if details_url.startswith("/"):
-            details_url = f"https://asgracing.github.io{details_url}"
-        lines.append(details_url)
+    lines.append(f"Race page: {details_url}")
 
     lines.append(f"Event ID: {build_event_id(item)}")
     lines.append(f"Starts at: {event_start.isoformat()}")
     return "\n".join(lines)
 
 
-def format_test_message(item, event_start):
-    return "\n".join(
+def format_html_message(item, trigger_key, event_start):
+    track_name = escape(str(item.get("track_name") or "Unknown track"))
+    date_str = escape(str(item.get("date") or "--").strip())
+    start_time_local = escape(str(item.get("start_time_local") or "--").strip())
+    timezone_label = escape(str(item.get("timezone") or "UTC").strip())
+    title = escape(build_notification_title(item, trigger_key))
+    hype_line = escape(build_hype_line(trigger_key))
+    details_url = escape(build_details_url(item))
+    event_id = escape(build_event_id(item))
+    starts_at = escape(event_start.isoformat())
+    registrations = item.get("registrations") or item.get("votes")
+
+    lines = [
+        f"🏁 <b>{title}</b>",
+        "",
+        f"🔥 {hype_line}",
+        f"📍 <b>Track:</b> {track_name}",
+        f"📅 <b>Date:</b> {date_str}",
+        f"⏰ <b>Start:</b> {start_time_local} {timezone_label}".strip(),
+    ]
+
+    if registrations not in (None, ""):
+        lines.append(f"👥 <b>Registrations:</b> {escape(str(registrations))}")
+
+    lines.extend(
         [
-            "[TEST] ASG Racing hourly notifier check.",
-            f"Track: {item.get('track_name') or 'Unknown track'}",
-            f"Date: {str(item.get('date') or '--').strip()}",
-            f"Start: {str(item.get('start_time_local') or '--').strip()} {str(item.get('timezone') or 'UTC').strip()}".strip(),
-            f"Event ID: {build_event_id(item)}",
-            f"Starts at: {event_start.isoformat()}",
+            "",
+            f"👉 <a href=\"{details_url}\">Open race page</a>",
+            f"🆔 <code>{event_id}</code>",
+            f"🕓 <code>{starts_at}</code>",
         ]
     )
+    return "\n".join(lines)
+
+
+def build_discord_payload(item, trigger_key, event_start):
+    track_name = str(item.get("track_name") or "Unknown track")
+    date_str = str(item.get("date") or "--").strip()
+    start_time_local = str(item.get("start_time_local") or "--").strip()
+    timezone_label = str(item.get("timezone") or "UTC").strip()
+    details_url = build_details_url(item)
+    registrations = item.get("registrations") or item.get("votes")
+
+    fields = [
+        {"name": "Track", "value": track_name, "inline": True},
+        {"name": "Date", "value": date_str, "inline": True},
+        {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
+    ]
+    if registrations not in (None, ""):
+        fields.append({"name": "Registrations", "value": str(registrations), "inline": True})
+
+    embed = {
+        "title": build_notification_title(item, trigger_key),
+        "description": build_hype_line(trigger_key),
+        "url": details_url,
+        "color": 16748032,
+        "fields": fields,
+        "footer": {"text": build_event_id(item)},
+        "timestamp": event_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    image_url = build_track_image_url(item)
+    if image_url:
+        embed["image"] = {"url": image_url}
+
+    return {
+        "content": "🏁 Hourly race alert",
+        "embeds": [embed],
+    }
+
+
+def format_test_message(item, event_start):
+    return build_plain_message(item, "test", event_start)
 
 
 def send_telegram_message(message):
@@ -211,12 +315,33 @@ def send_telegram_message(message):
     return True
 
 
-def send_discord_message(message):
+def send_telegram_photo(caption, image_url):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not bot_token or not chat_id or not image_url:
+        return False
+
+    payload = parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "photo": image_url,
+            "caption": caption,
+            "parse_mode": "HTML",
+        }
+    ).encode("utf-8")
+    url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+    req = request.Request(url, data=payload, method="POST")
+    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+        response.read()
+    return True
+
+
+def send_discord_message(payload):
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
     if not webhook_url:
         return False
 
-    payload = json.dumps({"content": message}).encode("utf-8")
+    payload = json.dumps(payload).encode("utf-8")
     req = request.Request(
         webhook_url,
         data=payload,
@@ -228,10 +353,16 @@ def send_discord_message(message):
     return True
 
 
-def dispatch(message):
+def dispatch(item, trigger_key, event_start):
     sent_any = False
-    sent_any = send_telegram_message(message) or sent_any
-    sent_any = send_discord_message(message) or sent_any
+    telegram_html = format_html_message(item, trigger_key, event_start)
+    track_image_url = build_track_image_url(item)
+    if track_image_url:
+        sent_any = send_telegram_photo(telegram_html, track_image_url) or sent_any
+    else:
+        sent_any = send_telegram_message(build_plain_message(item, trigger_key, event_start)) or sent_any
+
+    sent_any = send_discord_message(build_discord_payload(item, trigger_key, event_start)) or sent_any
     if not sent_any:
         raise RuntimeError("No notification target configured. Set Telegram and/or Discord secrets.")
 
@@ -277,7 +408,7 @@ def run():
             print(f"[dry-run] would send test notification for {event_id}")
             print(message)
         else:
-            dispatch(message)
+            dispatch(announcement, "test", event_start)
             print(f"test notification sent for {event_id}")
         state["last_event_id"] = event_id
         cleanup_state(state, event_id)
@@ -296,7 +427,7 @@ def run():
             print(f"[dry-run] would send {trigger_key} for {event_id}")
             print(message)
         else:
-            dispatch(message)
+            dispatch(announcement, trigger_key, event_start)
 
         event_state["sent"][trigger_key] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         sent_now.append(trigger_key)

@@ -75,3 +75,29 @@ Track switching flow:
 3. It opens the real ACC config at `server/cfg/event.json`.
 4. It rewrites the `track` field there.
 5. Only after that it starts `accServer.exe`.
+
+## GitHub notifications
+
+The repository includes `scripts/hourly_notify.py` and `.github/workflows/hourly-notify.yml` for Telegram and Discord reminders about the nearest hourly event.
+
+What it does:
+- loads the next event from `https://asgracing.github.io/hourly-data/announcement.json`
+- sends reminders when the start time is within the `24h`, `4h`, or `5m` window
+- stores sent-state in `.github/hourly_notify_state.json` so the same event is not announced twice
+
+Required GitHub secrets:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `DISCORD_WEBHOOK_URL`
+
+At least one target must be configured.
+
+Optional GitHub repository variables:
+- `HOURLY_ANNOUNCEMENT_URL`
+- `HOURLY_NOTIFY_WINDOW_MINUTES`
+- `HOURLY_NOTIFY_FINAL_WINDOW_MINUTES`
+
+Notes:
+- `workflow_dispatch` can be used for a dry run from the Actions tab
+- `workflow_dispatch` also supports `force_send=true` for an immediate test message without waiting for the notification window
+- scheduled workflows on GitHub only run from the default branch, so this branch can be tested manually but must be merged into the default branch before cron notifications will start

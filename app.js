@@ -26,6 +26,8 @@ const translations = {
     heroPitstopLabel: "Pitstop",
     heroMandatoryLabel: "Mandatory",
     heroWeatherLabel: "Weather",
+    copyAction: "Copy {field}",
+    copiedAction: "{field} copied",
     announcementEyebrow: "Next Event",
     scheduleEyebrow: "Schedule",
     archiveEyebrow: "Archive",
@@ -201,6 +203,11 @@ Object.assign(translations.ru, {
   unvoteButton: "Отменить голос"
 });
 
+Object.assign(translations.ru, {
+  copyAction: "РЎРєРѕРїРёСЂРѕРІР°С‚СЊ {field}",
+  copiedAction: "{field} СЃРєРѕРїРёСЂРѕРІР°РЅ"
+});
+
 let currentLang = "en";
 let announcementData = {};
 let scheduleItems = [];
@@ -254,6 +261,61 @@ function setText(id, value) {
   if (element) element.textContent = value || t("unknownValue");
 }
 function compactJoin(parts) { return parts.filter(Boolean).join(" · "); }
+function setHeroCopyButtonLabel(button, copied = false) {
+  if (!button) return;
+  const fieldLabel = t(button.dataset.copyLabelKey || "") || "";
+  const label = copied ? tf("copiedAction", { field: fieldLabel }) : tf("copyAction", { field: fieldLabel });
+  button.setAttribute("aria-label", label);
+  button.setAttribute("title", label);
+}
+async function copyToClipboard(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("copy failed");
+  return true;
+}
+function bindHeroCopyButtons(root = document) {
+  root.querySelectorAll(".hero-copy-btn").forEach(button => {
+    setHeroCopyButtonLabel(button, button.classList.contains("is-copied"));
+    if (button.dataset.copyBound === "true") return;
+    button.dataset.copyBound = "true";
+    button.addEventListener("click", async event => {
+      event.preventDefault();
+      const target = document.getElementById(button.dataset.copyTarget || "");
+      const value = target?.textContent?.trim() || "";
+      if (!target || !value || value === "--") return;
+      try {
+        await copyToClipboard(value);
+        button.classList.add("is-copied");
+        setHeroCopyButtonLabel(button, true);
+        window.clearTimeout(Number(button.dataset.copyResetTimer || 0));
+        const timerId = window.setTimeout(() => {
+          button.classList.remove("is-copied");
+          setHeroCopyButtonLabel(button, false);
+          delete button.dataset.copyResetTimer;
+        }, 1600);
+        button.dataset.copyResetTimer = String(timerId);
+      } catch (error) {
+        console.warn("hero copy failed", error);
+      }
+    });
+  });
+}
 function minutesFromSeconds(value) { return typeof value === "number" && !Number.isNaN(value) ? Math.round(value / 60) : null; }
 function percentValue(value) { return typeof value === "number" && !Number.isNaN(value) ? Math.round(value * 100) : null; }
 function formatMandatoryPitstopCount(value) {
@@ -676,6 +738,7 @@ function applyTranslations() {
   if (twitterDescriptionMeta) twitterDescriptionMeta.setAttribute("content", t("twitterDescription"));
   document.querySelectorAll("[data-i18n]").forEach(el => { const value = t(el.dataset.i18n); if (value !== undefined) el.textContent = value; });
   document.querySelectorAll("[data-i18n-aria-label]").forEach(el => { const value = t(el.dataset.i18nAriaLabel); if (value !== undefined) el.setAttribute("aria-label", value); });
+  bindHeroCopyButtons();
   document.querySelectorAll(".lang-btn").forEach(btn => {
     const isActive = btn.dataset.lang === currentLang;
     btn.classList.toggle("active", isActive);

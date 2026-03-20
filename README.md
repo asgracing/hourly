@@ -82,7 +82,7 @@ The repository includes `scripts/hourly_notify.py` and `.github/workflows/hourly
 
 What it does:
 - loads the next event from `https://asgracing.github.io/hourly-data/announcement.json`
-- sends reminders when the start time is within the `24h`, `4h`, `3h`, or `5m` window
+- sends reminders when the start time is within the `24h`, `2h`, or `15m` window
 - stores sent-state in `.github/hourly_notify_state.json` so the same event is not announced twice
 
 Required GitHub secrets:

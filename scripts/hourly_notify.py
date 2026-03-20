@@ -12,7 +12,7 @@ DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement
 DEFAULT_SCHEDULE_URL = "https://asgracing.github.io/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
-DEFAULT_FINAL_WINDOW_MINUTES = 3
+DEFAULT_FINAL_WINDOW_MINUTES = 5
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.github.io"
@@ -213,9 +213,8 @@ def build_windows(window_minutes, final_window_minutes):
     final_tolerance = timedelta(minutes=final_window_minutes)
     return {
         "24h": {"delta": timedelta(hours=24), "tolerance": standard_tolerance},
-        "4h": {"delta": timedelta(hours=4), "tolerance": standard_tolerance},
-        "3h": {"delta": timedelta(hours=3), "tolerance": standard_tolerance},
-        "5m": {"delta": timedelta(minutes=5), "tolerance": final_tolerance},
+        "2h": {"delta": timedelta(hours=2), "tolerance": standard_tolerance},
+        "15m": {"delta": timedelta(minutes=15), "tolerance": final_tolerance},
     }
 
 
@@ -226,19 +225,17 @@ def is_due(time_until_start, target_delta, tolerance):
 def get_trigger_label(trigger_key):
     if trigger_key == "24h":
         return "24 hours"
-    if trigger_key == "4h":
-        return "4 hours"
-    if trigger_key == "3h":
-        return "3 hours"
-    if trigger_key == "5m":
-        return "5 minutes"
+    if trigger_key == "2h":
+        return "2 hours"
+    if trigger_key == "15m":
+        return "15 minutes"
     return "test"
 
 
 def build_notification_title(item, trigger_key):
     lead = get_trigger_label(trigger_key)
     track_name = item.get("track_name") or "Unknown track"
-    if trigger_key == "5m":
+    if trigger_key == "15m":
         return f"Last call for {track_name} in {lead}"
     if trigger_key == "test":
         return f"ASG Racing test alert for {track_name}"
@@ -248,11 +245,9 @@ def build_notification_title(item, trigger_key):
 def build_hype_line(trigger_key):
     if trigger_key == "24h":
         return "Lock in your plan, warm up, and get ready for the next hourly battle."
-    if trigger_key == "4h":
-        return "Time to pick the setup, check the fuel, and get on the grid."
-    if trigger_key == "3h":
-        return "Three hours to go. Time to finish prep and make sure you are ready for the race."
-    if trigger_key == "5m":
+    if trigger_key == "2h":
+        return "Two hours to go. Time to finish prep, check the setup, and get ready for the race."
+    if trigger_key == "15m":
         return "Server is about to go live. Join now if you want to make the start."
     return "Quick delivery check for the hourly notifier."
 

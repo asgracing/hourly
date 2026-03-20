@@ -212,7 +212,6 @@ def build_windows(window_minutes, final_window_minutes):
     standard_tolerance = timedelta(minutes=window_minutes)
     final_tolerance = timedelta(minutes=final_window_minutes)
     return {
-        "24h": {"delta": timedelta(hours=24), "tolerance": standard_tolerance},
         "2h": {"delta": timedelta(hours=2), "tolerance": standard_tolerance},
         "15m": {"delta": timedelta(minutes=15), "tolerance": final_tolerance},
     }
@@ -223,8 +222,6 @@ def is_due(time_until_start, target_delta, tolerance):
 
 
 def get_trigger_label(trigger_key):
-    if trigger_key == "24h":
-        return "24 hours"
     if trigger_key == "2h":
         return "2 hours"
     if trigger_key == "15m":
@@ -243,8 +240,6 @@ def build_notification_title(item, trigger_key):
 
 
 def build_hype_line(trigger_key):
-    if trigger_key == "24h":
-        return "Lock in your plan, warm up, and get ready for the next hourly battle."
     if trigger_key == "2h":
         return "Two hours to go. Time to finish prep, check the setup, and get ready for the race."
     if trigger_key == "15m":

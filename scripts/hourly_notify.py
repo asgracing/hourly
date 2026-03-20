@@ -9,6 +9,7 @@ from urllib import error, parse, request
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement.json"
+DEFAULT_SCHEDULE_URL = "https://asgracing.github.io/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
 DEFAULT_FINAL_WINDOW_MINUTES = 3
@@ -161,6 +162,38 @@ def parse_event_start(item):
 
     tzinfo = parse_timezone_offset(item.get("timezone"))
     return datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=tzinfo)
+
+
+def load_schedule_items(schedule_url):
+    payload = load_remote_json(schedule_url)
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("items")
+    return items if isinstance(items, list) else []
+
+
+def pick_notification_item(announcement, schedule_items):
+    announcement_start = parse_event_start(announcement)
+    now = datetime.now(announcement_start.tzinfo or timezone.utc)
+    if announcement_start > now:
+        return announcement, announcement_start
+
+    candidates = []
+    for item in schedule_items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            item_start = parse_event_start(item)
+        except ValueError:
+            continue
+        if item_start > now:
+            candidates.append((item_start, item))
+
+    if not candidates:
+        return announcement, announcement_start
+
+    candidates.sort(key=lambda pair: pair[0])
+    return candidates[0][1], candidates[0][0]
 
 
 def format_display_date(value):
@@ -345,6 +378,7 @@ def cleanup_state(state, active_event_id):
 
 def run():
     announcement_url = read_env("HOURLY_ANNOUNCEMENT_URL", DEFAULT_ANNOUNCEMENT_URL)
+    schedule_url = read_env("HOURLY_SCHEDULE_URL", DEFAULT_SCHEDULE_URL)
     votes_api_base = read_env("HOURLY_VOTES_API_BASE", DEFAULT_VOTES_API_BASE)
     state_file = Path(read_env("HOURLY_NOTIFY_STATE_FILE", str(DEFAULT_STATE_FILE))).resolve()
     dry_run = os.getenv("HOURLY_NOTIFY_DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
@@ -355,6 +389,14 @@ def run():
     announcement = load_remote_json(announcement_url)
     if not isinstance(announcement, dict):
         raise ValueError("announcement.json must be an object")
+
+    try:
+        schedule_items = load_schedule_items(schedule_url)
+    except Exception as exc:
+        schedule_items = []
+        print(f"schedule api failed: {exc}; continue with announcement item")
+
+    announcement, event_start = pick_notification_item(announcement, schedule_items)
 
     event_id = build_event_id(announcement)
     if not event_id:
@@ -371,8 +413,6 @@ def run():
 
     if votes_summary and "votes" in votes_summary:
         announcement["registrations"] = votes_summary.get("votes")
-
-    event_start = parse_event_start(announcement)
     now = datetime.now(event_start.tzinfo or timezone.utc)
     time_until_start = event_start - now
 

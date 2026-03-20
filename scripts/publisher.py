@@ -805,6 +805,7 @@ def main():
     schedule_data = {"items": schedule_items, "updated_at": now_local_iso()}
     announcement = build_announcement(schedule_data, schedule_config, settings_data, event_config, event_rules)
     recent_races_summary, recent_races_details = build_recent_races(results_dir_path)
+    save_json(ROTATION_STATE_PATH, rotation_state)
     save_json(RUNTIME_STATE_PATH, runtime_state)
     save_json(SCHEDULE_PATH, schedule_data)
     save_json(ANNOUNCEMENT_PATH, announcement)

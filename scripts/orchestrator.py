@@ -167,6 +167,17 @@ def choose_next_track(schedule_config: dict, rotation_state: dict) -> tuple[dict
     if not tracks:
         raise ValueError("No tracks configured in schedule_config.json")
 
+    queued_codes = [
+        code
+        for code in (rotation_state.get("track_queue_codes") or [])
+        if isinstance(code, str)
+    ]
+    if queued_codes:
+        first_code = queued_codes[0]
+        for index, track in enumerate(tracks):
+            if track.get("code") == first_code:
+                return track, index
+
     next_index = rotation_state.get("next_track_index", 0)
     if not isinstance(next_index, int):
         next_index = 0
@@ -175,10 +186,27 @@ def choose_next_track(schedule_config: dict, rotation_state: dict) -> tuple[dict
     return tracks[normalized_index], normalized_index
 
 
-def update_rotation_state(rotation_state: dict, selected_track: dict, selected_index: int, tracks_count: int):
+def update_rotation_state(rotation_state: dict, selected_track: dict, selected_index: int, tracks: list[dict]):
+    tracks_count = len(tracks)
+    track_index_lookup = {
+        track.get("code"): index
+        for index, track in enumerate(tracks)
+        if isinstance(track, dict) and track.get("code")
+    }
+    queue_codes = [
+        code
+        for code in (rotation_state.get("track_queue_codes") or [])
+        if isinstance(code, str)
+    ]
+    if queue_codes and queue_codes[0] == selected_track.get("code"):
+        queue_codes = queue_codes[1:]
+    rotation_state["track_queue_codes"] = queue_codes
     rotation_state["last_track_code"] = selected_track.get("code")
     rotation_state["last_rotation_at"] = now_local_iso()
-    rotation_state["next_track_index"] = (selected_index + 1) % tracks_count
+    if queue_codes:
+        rotation_state["next_track_index"] = track_index_lookup.get(queue_codes[0], (selected_index + 1) % tracks_count)
+    else:
+        rotation_state["next_track_index"] = (selected_index + 1) % tracks_count
     return rotation_state
 
 
@@ -355,7 +383,7 @@ def main():
         save_json(event_config_path, event_config, encoding=event_encoding)
         save_json(
             ROTATION_STATE_PATH,
-            update_rotation_state(rotation_state, selected_track, selected_index, len(schedule_config["tracks"]))
+            update_rotation_state(rotation_state, selected_track, selected_index, schedule_config["tracks"])
         )
         runtime_state = update_runtime_state(runtime_state, event_config_path, selected_track, selected_slot, planned_weather)
         save_json(RUNTIME_STATE_PATH, runtime_state)

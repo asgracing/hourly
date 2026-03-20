@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 DEFAULT_LOOKAHEAD_SLOTS = 3
+DEFAULT_VISIBLE_SLOTS = 3
 DEFAULT_WEATHER_PROFILES = [
     {
         "id": 1,
@@ -153,6 +154,15 @@ def build_track_lookup(schedule_config: dict):
     return {track.get("code"): track for track in tracks if isinstance(track, dict) and track.get("code")}
 
 
+def build_track_index_lookup(schedule_config: dict):
+    tracks = schedule_config.get("tracks") or []
+    return {
+        track.get("code"): index
+        for index, track in enumerate(tracks)
+        if isinstance(track, dict) and track.get("code")
+    }
+
+
 def matches_slot(entry: dict, slot_date: str, slot_time: str):
     return isinstance(entry, dict) and entry.get("date") == slot_date and entry.get("start_time_local") == slot_time
 
@@ -292,16 +302,60 @@ def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_ti
     launch_times = parse_launch_times(schedule_config)
     tracks = schedule_config.get("tracks") or []
     track_lookup = build_track_lookup(schedule_config)
+    track_index_lookup = build_track_index_lookup(schedule_config)
     planning = get_weather_planning_config(schedule_config)
     if not launch_times or not tracks:
         return []
     next_track_index = rotation_state.get("next_track_index", 0)
     if not isinstance(next_track_index, int):
         next_track_index = 0
+    queue_length = max(planning["slots_ahead"], DEFAULT_VISIBLE_SLOTS + 1)
+    track_queue_codes = [
+        code
+        for code in (rotation_state.get("track_queue_codes") or [])
+        if isinstance(code, str) and code in track_lookup
+    ]
+    expected_first_code = tracks[next_track_index % len(tracks)].get("code")
+    if not track_queue_codes or track_queue_codes[0] != expected_first_code:
+        track_queue_codes = []
+
+    cursor = next_track_index % len(tracks)
+    while len(track_queue_codes) < min(DEFAULT_VISIBLE_SLOTS, queue_length):
+        track_queue_codes.append(tracks[cursor].get("code"))
+        cursor = (cursor + 1) % len(tracks)
+
+    if len(track_queue_codes) == DEFAULT_VISIBLE_SLOTS and queue_length > DEFAULT_VISIBLE_SLOTS:
+        hidden_candidates = [
+            track.get("code")
+            for track in tracks
+            if isinstance(track, dict)
+            and track.get("code")
+            and track.get("code") not in set(track_queue_codes)
+        ]
+        if not hidden_candidates:
+            hidden_candidates = [
+                track.get("code")
+                for track in tracks
+                if isinstance(track, dict) and track.get("code") and track.get("code") != track_queue_codes[-1]
+            ]
+        if not hidden_candidates:
+            hidden_candidates = [
+                track.get("code")
+                for track in tracks
+                if isinstance(track, dict) and track.get("code")
+            ]
+        random_hidden_code = random.choice(hidden_candidates)
+        track_queue_codes.append(random_hidden_code)
+        cursor = (track_index_lookup.get(random_hidden_code, cursor) + 1) % len(tracks)
+
+    while len(track_queue_codes) < queue_length:
+        track_queue_codes.append(tracks[cursor].get("code"))
+        cursor = (cursor + 1) % len(tracks)
+
+    rotation_state["track_queue_codes"] = track_queue_codes
     items = []
     current_time = current_time or now_local()
     current_date = current_time.date()
-    track_cursor = next_track_index % len(tracks)
     day_offset = 0
     while len(items) < planning["slots_ahead"] and day_offset < 30:
         slot_date = current_date + timedelta(days=day_offset)
@@ -314,7 +368,8 @@ def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_ti
             if is_exception(schedule_config, slot_date_str, slot_time_str):
                 continue
             override = find_override(schedule_config, slot_date_str, slot_time_str)
-            selected_track = tracks[track_cursor]
+            queue_track_code = track_queue_codes[len(items)] if len(items) < len(track_queue_codes) else None
+            selected_track = track_lookup.get(queue_track_code) or tracks[next_track_index % len(tracks)]
             if override and override.get("track_code"):
                 selected_track = track_lookup.get(override["track_code"], selected_track)
             item = {
@@ -329,7 +384,6 @@ def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_ti
             }
             item["track_name"] = item["track_name"] or selected_track.get("name") or normalize_track_name(selected_track.get("code"))
             items.append(item)
-            track_cursor = (track_cursor + 1) % len(tracks)
             if len(items) >= planning["slots_ahead"]:
                 break
         day_offset += 1

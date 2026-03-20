@@ -351,7 +351,15 @@ def run():
     if not event_id:
         raise ValueError("Could not build event_id for announcement")
 
-    votes_summary = load_votes_summary(votes_api_base, event_id)
+    try:
+        votes_summary = load_votes_summary(votes_api_base, event_id)
+    except error.HTTPError as exc:
+        votes_summary = {}
+        print(f"votes api failed: {exc.code} {exc.reason}; continue without registration count")
+    except Exception as exc:
+        votes_summary = {}
+        print(f"votes api failed: {exc}; continue without registration count")
+
     if votes_summary and "votes" in votes_summary:
         announcement["registrations"] = votes_summary.get("votes")
 

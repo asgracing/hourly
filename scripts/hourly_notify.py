@@ -338,7 +338,10 @@ def build_discord_payload(item, trigger_key):
         embed["image"] = {"url": image_url}
 
     return {
-        "content": "🏁 ASG Racing hourly alert",
+        "content": "@everyone 🏁 ASG Racing hourly alert",
+        "allowed_mentions": {
+            "parse": ["everyone"]
+        },
         "embeds": [embed],
     }
 

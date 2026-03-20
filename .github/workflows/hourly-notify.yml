@@ -1,0 +1,49 @@
+name: Hourly Notify
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print message without sending notifications"
+        required: false
+        default: "true"
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run notifier
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          HOURLY_ANNOUNCEMENT_URL: ${{ vars.HOURLY_ANNOUNCEMENT_URL }}
+          HOURLY_NOTIFY_WINDOW_MINUTES: ${{ vars.HOURLY_NOTIFY_WINDOW_MINUTES }}
+          HOURLY_NOTIFY_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+        run: python scripts/hourly_notify.py
+
+      - name: Commit updated notify state
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/hourly_notify_state.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update hourly notify state"
+          git push

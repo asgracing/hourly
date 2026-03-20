@@ -214,6 +214,7 @@ def build_windows(window_minutes, final_window_minutes):
     return {
         "24h": {"delta": timedelta(hours=24), "tolerance": standard_tolerance},
         "4h": {"delta": timedelta(hours=4), "tolerance": standard_tolerance},
+        "3h": {"delta": timedelta(hours=3), "tolerance": standard_tolerance},
         "5m": {"delta": timedelta(minutes=5), "tolerance": final_tolerance},
     }
 
@@ -227,6 +228,8 @@ def get_trigger_label(trigger_key):
         return "24 hours"
     if trigger_key == "4h":
         return "4 hours"
+    if trigger_key == "3h":
+        return "3 hours"
     if trigger_key == "5m":
         return "5 minutes"
     return "test"
@@ -247,6 +250,8 @@ def build_hype_line(trigger_key):
         return "Lock in your plan, warm up, and get ready for the next hourly battle."
     if trigger_key == "4h":
         return "Time to pick the setup, check the fuel, and get on the grid."
+    if trigger_key == "3h":
+        return "Three hours to go. Time to finish prep and make sure you are ready for the race."
     if trigger_key == "5m":
         return "Server is about to go live. Join now if you want to make the start."
     return "Quick delivery check for the hourly notifier."

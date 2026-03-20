@@ -1,8 +1,8 @@
 import json
 import os
 import sys
-from html import escape
 from datetime import datetime, timedelta, timezone
+from html import escape
 from pathlib import Path
 from urllib import error, parse, request
 
@@ -13,10 +13,11 @@ DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
 DEFAULT_FINAL_WINDOW_MINUTES = 3
 DEFAULT_TIMEOUT_SECONDS = 20
+DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.github.io"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
-DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
+SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
 
 
 def normalize_event_id(value):
@@ -35,36 +36,12 @@ def normalize_event_id(value):
     return "".join(chars).strip("_")
 
 
-def build_event_id(item):
-    explicit_id = normalize_event_id(item.get("event_id"))
-    if explicit_id:
-        return explicit_id
-
-    date_str = str(item.get("date") or "").strip()
-    time_str = str(item.get("start_time_local") or "").strip().replace(":", "")
-    track_code = normalize_event_id(item.get("track_code") or item.get("track_name") or "slot")
-    return normalize_event_id(f"hourly_{date_str}_{time_str}_{track_code}")
-
-
-def build_details_url(item):
-    details_url = str(item.get("details_url") or "").strip()
-    if not details_url:
-        return HOURLY_PAGE_URL
-    if details_url.startswith("http://") or details_url.startswith("https://"):
-        return details_url
-    if details_url.startswith("/"):
-        return f"{SITE_BASE_URL}{details_url}"
-    return f"{HOURLY_PAGE_URL}{details_url.lstrip('./')}"
-
-
-def build_track_image_url(item):
-    track_code = normalize_event_id(item.get("track_code") or item.get("track_name"))
-    if not track_code:
-        return ""
-    supported = {"spa", "monza", "silverstone", "nurburgring"}
-    if track_code not in supported:
-        return ""
-    return f"{TRACK_IMAGE_BASE_URL}/{track_code}.jpg"
+def read_env(name, default_value):
+    value = os.getenv(name)
+    if value is None:
+        return default_value
+    value = value.strip()
+    return value or default_value
 
 
 def load_remote_json(url):
@@ -87,14 +64,6 @@ def load_votes_summary(votes_api_base, event_id):
     return summary if isinstance(summary, dict) else {}
 
 
-def read_env(name, default_value):
-    value = os.getenv(name)
-    if value is None:
-        return default_value
-    value = value.strip()
-    return value or default_value
-
-
 def load_state(state_file):
     if not state_file.exists():
         return {"events": {}}
@@ -111,17 +80,40 @@ def save_state(state_file, state):
     state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def build_event_id(item):
+    explicit_id = normalize_event_id(item.get("event_id"))
+    if explicit_id:
+        return explicit_id
+
+    date_str = str(item.get("date") or "").strip()
+    time_str = str(item.get("start_time_local") or "").strip().replace(":", "")
+    track_code = normalize_event_id(item.get("track_code") or item.get("track_name") or "slot")
+    return normalize_event_id(f"hourly_{date_str}_{time_str}_{track_code}")
+
+
+def build_details_url(item):
+    details_url = str(item.get("details_url") or "").strip()
+    if not details_url:
+        return HOURLY_PAGE_URL
+    if details_url.startswith(("http://", "https://")):
+        return details_url
+    if details_url.startswith("/"):
+        return f"{SITE_BASE_URL}{details_url}"
+    return f"{HOURLY_PAGE_URL}{details_url.lstrip('./')}"
+
+
+def build_track_image_url(item):
+    track_code = normalize_event_id(item.get("track_code") or item.get("track_name"))
+    if track_code not in SUPPORTED_TRACK_IMAGES:
+        return ""
+    return f"{TRACK_IMAGE_BASE_URL}/{track_code}.jpg"
+
+
 def parse_timezone_offset(value):
     raw = str(value or "").strip().upper()
-    if not raw:
+    if not raw or raw in {"UTC", "GMT"}:
         return timezone.utc
-    if raw in {"UTC", "GMT"}:
-        return timezone.utc
-    if raw == "MSK":
-        return timezone(timedelta(hours=3))
-    if raw == "UTC+3":
-        return timezone(timedelta(hours=3))
-    if raw == "UTC+03:00":
+    if raw in {"MSK", "UTC+3", "UTC+03:00"}:
         return timezone(timedelta(hours=3))
     if raw == "UTC-3":
         return timezone(-timedelta(hours=3))
@@ -218,7 +210,7 @@ def build_hype_line(trigger_key):
     return "Quick delivery check for the hourly notifier."
 
 
-def build_plain_message(item, trigger_key, event_start):
+def build_plain_message(item, trigger_key):
     track_name = item.get("track_name") or "Unknown track"
     start_time_local = str(item.get("start_time_local") or "--").strip()
     timezone_label = str(item.get("timezone") or "UTC").strip()
@@ -227,7 +219,7 @@ def build_plain_message(item, trigger_key, event_start):
     details_url = build_details_url(item)
 
     lines = [
-        f"{build_notification_title(item, trigger_key)}",
+        build_notification_title(item, trigger_key),
         build_hype_line(trigger_key),
         f"Track: {track_name}",
         f"Date: {date_str}",
@@ -245,7 +237,7 @@ def build_plain_message(item, trigger_key, event_start):
     return "\n".join(lines)
 
 
-def format_html_message(item, trigger_key, event_start):
+def build_photo_caption(item, trigger_key):
     track_name = escape(str(item.get("track_name") or "Unknown track"))
     date_str = escape(format_display_date(item.get("date")))
     start_time_local = escape(str(item.get("start_time_local") or "--").strip())
@@ -276,45 +268,6 @@ def format_html_message(item, trigger_key, event_start):
     return "\n".join(lines)
 
 
-def build_discord_payload(item, trigger_key, event_start):
-    track_name = str(item.get("track_name") or "Unknown track")
-    date_str = format_display_date(item.get("date"))
-    start_time_local = str(item.get("start_time_local") or "--").strip()
-    timezone_label = str(item.get("timezone") or "UTC").strip()
-    details_url = build_details_url(item)
-    registrations = item.get("registrations")
-
-    fields = [
-        {"name": "Track", "value": track_name, "inline": True},
-        {"name": "Date", "value": date_str, "inline": True},
-        {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
-    ]
-    if registrations not in (None, ""):
-        fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
-
-    embed = {
-        "title": build_notification_title(item, trigger_key),
-        "description": build_hype_line(trigger_key),
-        "url": details_url,
-        "color": 16748032,
-        "fields": fields,
-        "footer": {"text": build_event_id(item)},
-        "timestamp": event_start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-    }
-    image_url = build_track_image_url(item)
-    if image_url:
-        embed["image"] = {"url": image_url}
-
-    return {
-        "content": "🏁 Hourly race alert",
-        "embeds": [embed],
-    }
-
-
-def format_test_message(item, event_start):
-    return build_plain_message(item, "test", event_start)
-
-
 def send_telegram_message(message):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
@@ -325,7 +278,7 @@ def send_telegram_message(message):
         {
             "chat_id": chat_id,
             "text": message,
-            "disable_web_page_preview": "true",
+            "disable_web_page_preview": "false",
         }
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -356,35 +309,20 @@ def send_telegram_photo(caption, image_url):
     return True
 
 
-def send_discord_message(payload):
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
-    if not webhook_url:
-        return False
-
-    payload = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        webhook_url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
-        response.read()
-    return True
-
-
-def dispatch(item, trigger_key, event_start):
-    sent_any = False
-    telegram_html = format_html_message(item, trigger_key, event_start)
+def dispatch(item, trigger_key):
     track_image_url = build_track_image_url(item)
     if track_image_url:
-        sent_any = send_telegram_photo(telegram_html, track_image_url) or sent_any
-    else:
-        sent_any = send_telegram_message(build_plain_message(item, trigger_key, event_start)) or sent_any
+        try:
+            if send_telegram_photo(build_photo_caption(item, trigger_key), track_image_url):
+                return
+        except error.HTTPError as exc:
+            print(f"telegram photo failed: {exc.code} {exc.reason}; fallback to text")
+        except Exception as exc:
+            print(f"telegram photo failed: {exc}; fallback to text")
 
-    sent_any = send_discord_message(build_discord_payload(item, trigger_key, event_start)) or sent_any
-    if not sent_any:
-        raise RuntimeError("No notification target configured. Set Telegram and/or Discord secrets.")
+    if send_telegram_message(build_plain_message(item, trigger_key)):
+        return
+    raise RuntimeError("Telegram is not configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.")
 
 
 def cleanup_state(state, active_event_id):
@@ -402,9 +340,7 @@ def run():
     state_file = Path(read_env("HOURLY_NOTIFY_STATE_FILE", str(DEFAULT_STATE_FILE))).resolve()
     dry_run = os.getenv("HOURLY_NOTIFY_DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
     window_minutes = int(read_env("HOURLY_NOTIFY_WINDOW_MINUTES", str(DEFAULT_WINDOW_MINUTES)))
-    final_window_minutes = int(
-        read_env("HOURLY_NOTIFY_FINAL_WINDOW_MINUTES", str(DEFAULT_FINAL_WINDOW_MINUTES))
-    )
+    final_window_minutes = int(read_env("HOURLY_NOTIFY_FINAL_WINDOW_MINUTES", str(DEFAULT_FINAL_WINDOW_MINUTES)))
     force_send = os.getenv("HOURLY_NOTIFY_FORCE_SEND", "").strip().lower() in {"1", "true", "yes"}
 
     announcement = load_remote_json(announcement_url)
@@ -428,12 +364,12 @@ def run():
     sent_now = []
 
     if force_send:
-        message = format_test_message(announcement, event_start)
+        message = build_plain_message(announcement, "test")
         if dry_run:
             print(f"[dry-run] would send test notification for {event_id}")
             print(message)
         else:
-            dispatch(announcement, "test", event_start)
+            dispatch(announcement, "test")
             print(f"test notification sent for {event_id}")
         state["last_event_id"] = event_id
         cleanup_state(state, event_id)
@@ -447,12 +383,12 @@ def run():
         if not is_due(time_until_start, trigger_config["delta"], trigger_config["tolerance"]):
             continue
 
-        message = build_plain_message(announcement, trigger_key, event_start)
+        message = build_plain_message(announcement, trigger_key)
         if dry_run:
             print(f"[dry-run] would send {trigger_key} for {event_id}")
             print(message)
         else:
-            dispatch(announcement, trigger_key, event_start)
+            dispatch(announcement, trigger_key)
 
         event_state["sent"][trigger_key] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         sent_now.append(trigger_key)

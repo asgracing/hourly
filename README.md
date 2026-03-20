@@ -78,7 +78,7 @@ Track switching flow:
 
 ## GitHub notifications
 
-The repository includes `scripts/hourly_notify.py` and `.github/workflows/hourly-notify.yml` for Telegram and Discord reminders about the nearest hourly event.
+The repository includes `scripts/hourly_notify.py` and `.github/workflows/hourly-notify.yml` for Telegram reminders about the nearest hourly event.
 
 What it does:
 - loads the next event from `https://asgracing.github.io/hourly-data/announcement.json`
@@ -88,12 +88,10 @@ What it does:
 Required GitHub secrets:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
-- `DISCORD_WEBHOOK_URL`
-
-At least one target must be configured.
 
 Optional GitHub repository variables:
 - `HOURLY_ANNOUNCEMENT_URL`
+- `HOURLY_VOTES_API_BASE`
 - `HOURLY_NOTIFY_WINDOW_MINUTES`
 - `HOURLY_NOTIFY_FINAL_WINDOW_MINUTES`
 

@@ -36,8 +36,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           HOURLY_ANNOUNCEMENT_URL: ${{ vars.HOURLY_ANNOUNCEMENT_URL }}
+          HOURLY_VOTES_API_BASE: ${{ vars.HOURLY_VOTES_API_BASE }}
           HOURLY_NOTIFY_WINDOW_MINUTES: ${{ vars.HOURLY_NOTIFY_WINDOW_MINUTES }}
           HOURLY_NOTIFY_FINAL_WINDOW_MINUTES: ${{ vars.HOURLY_NOTIFY_FINAL_WINDOW_MINUTES }}
           HOURLY_NOTIFY_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}

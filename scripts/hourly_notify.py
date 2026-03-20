@@ -16,6 +16,7 @@ DEFAULT_TIMEOUT_SECONDS = 20
 SITE_BASE_URL = "https://asgracing.github.io"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
+DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 
 
 def normalize_event_id(value):
@@ -69,6 +70,21 @@ def build_track_image_url(item):
 def load_remote_json(url):
     with request.urlopen(url, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def load_votes_summary(votes_api_base, event_id):
+    if not votes_api_base or not event_id:
+        return {}
+    url = f"{votes_api_base.rstrip('/')}/votes?event_ids={parse.quote(event_id)}&voter_id=notify-bot"
+    with request.urlopen(url, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        return {}
+    items = payload.get("items")
+    if not isinstance(items, dict):
+        return {}
+    summary = items.get(event_id)
+    return summary if isinstance(summary, dict) else {}
 
 
 def read_env(name, default_value):
@@ -146,6 +162,18 @@ def parse_event_start(item):
     return datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=tzinfo)
 
 
+def format_display_date(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return "--"
+    for candidate in (raw, f"{raw}T00:00:00"):
+        try:
+            return datetime.fromisoformat(candidate.replace("Z", "+00:00")).strftime("%d.%m.%Y")
+        except ValueError:
+            continue
+    return raw
+
+
 def build_windows(window_minutes, final_window_minutes):
     standard_tolerance = timedelta(minutes=window_minutes)
     final_tolerance = timedelta(minutes=final_window_minutes)
@@ -191,12 +219,11 @@ def build_hype_line(trigger_key):
 
 
 def build_plain_message(item, trigger_key, event_start):
-    lead = get_trigger_label(trigger_key)
     track_name = item.get("track_name") or "Unknown track"
     start_time_local = str(item.get("start_time_local") or "--").strip()
     timezone_label = str(item.get("timezone") or "UTC").strip()
-    date_str = str(item.get("date") or "--").strip()
-    registrations = item.get("registrations") or item.get("votes")
+    date_str = format_display_date(item.get("date"))
+    registrations = item.get("registrations")
     details_url = build_details_url(item)
 
     lines = [
@@ -208,30 +235,25 @@ def build_plain_message(item, trigger_key, event_start):
     ]
 
     if registrations not in (None, ""):
-        lines.append(f"Registrations: {registrations}")
+        lines.append(f"Registered drivers: {registrations}")
 
     description = str(item.get("description") or "").strip()
     if description:
         lines.append(description)
 
     lines.append(f"Race page: {details_url}")
-
-    lines.append(f"Event ID: {build_event_id(item)}")
-    lines.append(f"Starts at: {event_start.isoformat()}")
     return "\n".join(lines)
 
 
 def format_html_message(item, trigger_key, event_start):
     track_name = escape(str(item.get("track_name") or "Unknown track"))
-    date_str = escape(str(item.get("date") or "--").strip())
+    date_str = escape(format_display_date(item.get("date")))
     start_time_local = escape(str(item.get("start_time_local") or "--").strip())
     timezone_label = escape(str(item.get("timezone") or "UTC").strip())
     title = escape(build_notification_title(item, trigger_key))
     hype_line = escape(build_hype_line(trigger_key))
     details_url = escape(build_details_url(item))
-    event_id = escape(build_event_id(item))
-    starts_at = escape(event_start.isoformat())
-    registrations = item.get("registrations") or item.get("votes")
+    registrations = item.get("registrations")
 
     lines = [
         f"🏁 <b>{title}</b>",
@@ -243,14 +265,12 @@ def format_html_message(item, trigger_key, event_start):
     ]
 
     if registrations not in (None, ""):
-        lines.append(f"👥 <b>Registrations:</b> {escape(str(registrations))}")
+        lines.append(f"👥 <b>Registered drivers:</b> {escape(str(registrations))}")
 
     lines.extend(
         [
             "",
             f"👉 <a href=\"{details_url}\">Open race page</a>",
-            f"🆔 <code>{event_id}</code>",
-            f"🕓 <code>{starts_at}</code>",
         ]
     )
     return "\n".join(lines)
@@ -258,11 +278,11 @@ def format_html_message(item, trigger_key, event_start):
 
 def build_discord_payload(item, trigger_key, event_start):
     track_name = str(item.get("track_name") or "Unknown track")
-    date_str = str(item.get("date") or "--").strip()
+    date_str = format_display_date(item.get("date"))
     start_time_local = str(item.get("start_time_local") or "--").strip()
     timezone_label = str(item.get("timezone") or "UTC").strip()
     details_url = build_details_url(item)
-    registrations = item.get("registrations") or item.get("votes")
+    registrations = item.get("registrations")
 
     fields = [
         {"name": "Track", "value": track_name, "inline": True},
@@ -270,7 +290,7 @@ def build_discord_payload(item, trigger_key, event_start):
         {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
     ]
     if registrations not in (None, ""):
-        fields.append({"name": "Registrations", "value": str(registrations), "inline": True})
+        fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
 
     embed = {
         "title": build_notification_title(item, trigger_key),
@@ -378,6 +398,7 @@ def cleanup_state(state, active_event_id):
 
 def run():
     announcement_url = read_env("HOURLY_ANNOUNCEMENT_URL", DEFAULT_ANNOUNCEMENT_URL)
+    votes_api_base = read_env("HOURLY_VOTES_API_BASE", DEFAULT_VOTES_API_BASE)
     state_file = Path(read_env("HOURLY_NOTIFY_STATE_FILE", str(DEFAULT_STATE_FILE))).resolve()
     dry_run = os.getenv("HOURLY_NOTIFY_DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
     window_minutes = int(read_env("HOURLY_NOTIFY_WINDOW_MINUTES", str(DEFAULT_WINDOW_MINUTES)))
@@ -393,6 +414,10 @@ def run():
     event_id = build_event_id(announcement)
     if not event_id:
         raise ValueError("Could not build event_id for announcement")
+
+    votes_summary = load_votes_summary(votes_api_base, event_id)
+    if votes_summary and "votes" in votes_summary:
+        announcement["registrations"] = votes_summary.get("votes")
 
     event_start = parse_event_start(announcement)
     now = datetime.now(event_start.tzinfo or timezone.utc)
@@ -422,7 +447,7 @@ def run():
         if not is_due(time_until_start, trigger_config["delta"], trigger_config["tolerance"]):
             continue
 
-        message = format_message(announcement, trigger_key, event_start)
+        message = build_plain_message(announcement, trigger_key, event_start)
         if dry_run:
             print(f"[dry-run] would send {trigger_key} for {event_id}")
             print(message)

@@ -13,7 +13,9 @@
       }
     },
     "hourly_2026-03-21_2000_nurburgring": {
-      "sent": {}
+      "sent": {
+        "2h": "2026-03-21T14:48:25+00:00"
+      }
     }
   },
   "last_event_id": "hourly_2026-03-21_2000_nurburgring"

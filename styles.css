@@ -1338,6 +1338,8 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .modal-card-slot {
+  max-height: none;
+  overflow: visible;
   background:
     linear-gradient(112deg, rgba(7, 11, 16, 0.2) 0%, rgba(7, 11, 16, 0.2) 36%, rgba(7, 11, 16, 0.2) 100%),
     radial-gradient(circle at top right, rgba(255, 184, 77, 0.12), transparent 30%),
@@ -1418,25 +1420,190 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .schedule-modal-details {
+  display: block;
+}
+
+.schedule-modal-hero {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.75fr) minmax(320px, 0.95fr);
   gap: 12px;
+  align-items: start;
 }
 
-.schedule-detail-card {
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  background: rgba(8, 12, 18, 0.6);
+.schedule-modal-hero-pane {
+  min-height: 0;
+  order: 1;
 }
 
-.schedule-detail-card-strong .schedule-detail-value,
-.schedule-detail-card-weather .schedule-detail-value {
-  font-size: 1.1rem;
-}
-
-.schedule-detail-card-weather {
+.schedule-modal-vote {
   grid-column: 1 / -1;
+  order: 2;
+}
+
+#schedule-modal .schedule-modal-vote .hero-vote {
+  margin-top: 0;
+}
+
+#schedule-modal .hero-server-card,
+#schedule-modal .hero-announcement-card {
+  backdrop-filter: blur(10px);
+}
+
+#schedule-modal .hero-server-card {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px;
+}
+
+#schedule-modal .hero-announcement-card {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px;
+}
+
+#schedule-modal .hero-announcement-meta {
+  grid-template-columns: 1fr;
+}
+
+#schedule-modal .hero-announcement-head {
+  display: none;
+}
+
+#schedule-modal .hero-server-item,
+#schedule-modal .hero-announcement-weather,
+#schedule-modal .hero-announcement-meta .stat {
+  background: rgba(9, 14, 21, 0.56);
+}
+
+#schedule-modal .hero-server-grid {
+  gap: 10px 12px;
+}
+
+#schedule-modal .hero-server-grid-rules {
+  gap: 10px;
+}
+
+#schedule-modal .hero-server-item {
+  padding: 12px 13px;
+}
+
+#schedule-modal .hero-token-list {
+  gap: 6px;
+}
+
+#schedule-modal .hero-token {
+  min-height: 26px;
+  padding: 5px 8px;
+  font-size: 0.74rem;
+}
+
+#schedule-modal .hero-announcement-inline-meta {
+  gap: 10px;
+}
+
+#schedule-modal .modal-subtitle {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 12px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  backdrop-filter: none;
+  color: inherit;
+}
+
+.schedule-modal-subtitle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.schedule-modal-subtitle-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(8, 12, 18, 0.46);
+  backdrop-filter: blur(8px);
+}
+
+.schedule-modal-subtitle-label {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.schedule-modal-subtitle-value {
+  color: #f4f8ff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.schedule-modal-subtitle-card:nth-child(1) .schedule-modal-subtitle-value,
+.schedule-modal-subtitle-card:nth-child(2) .schedule-modal-subtitle-value {
+  font-size: calc(0.9rem + 4px);
+  line-height: 1.2;
+}
+
+.schedule-modal-subtitle-card:nth-child(3) .schedule-modal-subtitle-value {
+  display: inline-block;
+  line-height: 1.45;
+}
+
+#schedule-modal .hero-announcement-inline-stat-combined {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+#schedule-modal .hero-announcement-inline-stat-combined .hero-token-list {
+  gap: 4px;
+}
+
+#schedule-modal .hero-announcement-inline-stat-combined .value {
+  width: 100%;
+}
+
+#schedule-modal .hero-announcement-inline-divider {
+  display: none;
+}
+
+#schedule-modal .hero-announcement-inline-stat-combined .hero-token {
+  min-height: 24px;
+  padding: 4px 7px;
+  font-size: 0.68rem;
+}
+
+#schedule-modal .hero-announcement-stat-track .value {
+  font-size: 1rem;
+}
+
+#schedule-modal .hero-announcement-weather {
+  padding: 10px 12px;
+}
+
+#schedule-modal .hero-announcement-weather .hero-token-list {
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+#schedule-modal .hero-announcement-weather .hero-token {
+  min-height: 24px;
+  padding: 4px 6px;
+  font-size: 0.68rem;
+}
+
+#schedule-modal .hero-announcement-weather .hero-token-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .modal-card-weather {
@@ -1452,7 +1619,7 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .weather-detail-card {
-  padding: 16px;
+  padding: 21px;
   border: 1px solid rgba(255, 209, 102, 0.12);
   border-radius: 18px;
   background: rgba(8, 12, 18, 0.56);
@@ -1466,15 +1633,15 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .weather-detail-icon {
-  width: 30px;
-  height: 30px;
+  width: 39px;
+  height: 39px;
   object-fit: contain;
   flex: 0 0 auto;
 }
 
 .weather-detail-value {
   color: #fff5d1;
-  font-size: 1rem;
+  font-size: 1.3rem;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -1486,33 +1653,15 @@ tbody tr:not(.is-interactive-row):hover {
 .weather-detail-title {
   margin-bottom: 6px;
   color: #f3f7fe;
-  font-size: 0.92rem;
+  font-size: 1.08rem;
   font-weight: 800;
   line-height: 1.2;
 }
 
 .weather-detail-body {
   color: #d7e0ed;
-  font-size: 0.84rem;
-  font-weight: 600;
-  line-height: 1.45;
-}
-
-.schedule-detail-label {
-  margin-bottom: 8px;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.schedule-detail-value {
   font-size: 1rem;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
-.schedule-detail-copy {
-  font-size: 0.98rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.45;
 }
 
@@ -1681,6 +1830,195 @@ body.modal-open {
 
   .lang-text {
     display: none;
+  }
+}
+
+@media (max-width: 840px) and (min-width: 721px) {
+  .hero {
+    padding-top: 18px;
+  }
+
+  .hero-card {
+    padding: 8px;
+    border-radius: 22px;
+  }
+
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .hero-announcement-card {
+    order: -1;
+    padding: 9px;
+    gap: 9px;
+  }
+
+  .hero-server-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-server-grid-rules {
+    grid-template-columns: 1fr;
+  }
+
+  #hero-vote {
+    order: -1;
+  }
+
+  .hero-server-grid-major {
+    order: 1;
+  }
+
+  .hero-server-grid-minor {
+    order: 2;
+  }
+
+  .hero-server-stack {
+    order: 3;
+  }
+
+  .hero-server-card {
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .hero-server-item,
+  .hero-announcement-meta .stat,
+  .hero-announcement-weather {
+    padding: 7px 8px;
+  }
+
+  .hero-server-item .label,
+  .hero-announcement-weather .label,
+  .hero-announcement-meta .label {
+    margin-bottom: 0;
+    flex: 0 0 auto;
+  }
+
+  .hero-server-item .value,
+  .hero-announcement-weather .value,
+  .hero-announcement-meta .value {
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: center;
+    margin-left: 0;
+  }
+
+  .hero-server-item-emphasis .value {
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .hero-server-item-emphasis {
+    display: block;
+  }
+
+  .hero-server-item-emphasis .label {
+    margin-bottom: 6px;
+    text-align: left;
+  }
+
+  .hero-server-item-emphasis .hero-copy-row {
+    justify-content: space-between;
+    margin-left: 0;
+  }
+
+  .hero-server-item-emphasis .value {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .hero-server-item.has-token-value,
+  .hero-announcement-weather.has-token-value {
+    display: block;
+  }
+
+  .hero-server-item.has-token-value .label,
+  .hero-announcement-weather.has-token-value .label {
+    margin-bottom: 6px;
+  }
+
+  .hero-server-item.has-token-value .value,
+  .hero-announcement-weather.has-token-value .value {
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .hero-server-grid-rules .hero-server-item {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .hero-server-grid-rules .hero-server-item .label {
+    text-align: left;
+  }
+
+  .hero-server-grid-rules .hero-server-item .value {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .hero-token-list {
+    gap: 6px;
+  }
+
+  .hero-token {
+    min-height: 26px;
+    padding: 5px 9px;
+    font-size: 0.74rem;
+  }
+
+  .hero-token-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .hero-token-tooltip {
+    display: none;
+  }
+
+  #hero-weather-card {
+    cursor: pointer;
+  }
+
+  .hero-announcement-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-announcement-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-announcement-inline-stat-combined {
+    gap: 3px;
+  }
+
+  .hero-announcement-inline-divider {
+    opacity: 0.65;
+    width: 1px;
+  }
+
+  .hero-announcement-inline-stat-combined .hero-token-list {
+    gap: 2px;
+  }
+
+  .hero-announcement-inline-stat-combined .hero-token {
+    min-height: 24px;
+    padding: 4px 7px;
+    font-size: 0.68rem;
+    line-height: 1.05;
+  }
+
+  .hero-announcement-stat-plain {
+    min-width: 0;
+  }
+
+  .hero-announcement-stat-track {
+    grid-column: 1 / -1;
   }
 }
 
@@ -2007,7 +2345,35 @@ body.modal-open {
   }
 
   .schedule-modal-details {
+    display: block;
+  }
+
+  .schedule-modal-hero {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-modal-subtitle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-modal-vote {
+    order: -1;
+  }
+
+  #schedule-modal.is-open {
+    padding-top: 118px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  #schedule-modal .modal-card-slot {
+    max-height: calc(100dvh - 128px);
+    overflow: auto;
+    width: 100%;
+    padding: 16px;
+    border-radius: 20px;
   }
 
   .list-item,

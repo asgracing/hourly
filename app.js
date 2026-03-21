@@ -397,34 +397,6 @@ function buildRaceFormat(session) {
   if (overtimeMinutes && overtimeMinutes > 0) parts.push(tf("overtime", { value: overtimeMinutes }));
   return compactJoin(parts) || t("unknownValue");
 }
-function buildPitstopRules(rules) {
-  if (!rules || typeof rules !== "object") return t("unknownValue");
-  const parts = [formatMandatoryPitstopCount(rules.mandatory_pitstop_count)];
-  if (typeof rules.pit_window_length_minutes === "number" && rules.pit_window_length_minutes > 0) parts.push(tf("pitWindow", { value: rules.pit_window_length_minutes }));
-  if (rules.refuelling_allowed_in_race) parts.push(t("pitRefuelAllowed"));
-  if (rules.refuelling_time_fixed) parts.push(t("pitRefuelFixed"));
-  return compactJoin(parts) || t("unknownValue");
-}
-function buildMandatoryActions(rules) {
-  if (!rules || typeof rules !== "object") return t("unknownValue");
-  const actions = [];
-  if (rules.mandatory_pitstop_refuelling_required) actions.push(t("mandatoryRefuel"));
-  if (rules.mandatory_pitstop_tyre_change_required) actions.push(t("mandatoryTyres"));
-  if (rules.mandatory_pitstop_swap_driver_required) actions.push(t("mandatoryDriverSwap"));
-  return compactJoin(actions) || t("mandatoryNone");
-}
-function buildWeatherSummary(weather) {
-  if (!weather || typeof weather !== "object") return t("unknownValue");
-  const summaryKey = weather.summary_key ? `weather${weather.summary_key[0].toUpperCase()}${weather.summary_key.slice(1)}` : null;
-  const parts = [summaryKey ? t(summaryKey) : null];
-  if (typeof weather.ambient_temp_c === "number") parts.push(tf("weatherTemp", { value: weather.ambient_temp_c }));
-  const cloudPercent = percentValue(weather.cloud_level);
-  if (cloudPercent !== null) parts.push(tf("weatherClouds", { value: cloudPercent }));
-  const rainPercent = percentValue(weather.rain_level);
-  if (rainPercent !== null) parts.push(tf("weatherRain", { value: rainPercent }));
-  if (typeof weather.weather_randomness === "number") parts.push(tf("weatherRandomness", { value: weather.weather_randomness }));
-  return compactJoin(parts) || t("unknownValue");
-}
 function createHeroToken(label, tone = "default", icon = "", tooltipTitle = "", tooltipBody = "") {
   return { label, tone, icon, tooltipTitle, tooltipBody };
 }
@@ -615,48 +587,50 @@ function formatScheduleDateTime(item) {
   const timezone = getLocalizedField(item, "timezone", item?.timezone || "UTC+3");
   return `${formatDate(item?.date)} · ${startTime} ${timezone}`;
 }
-function buildScheduleModalSummary(item) {
-  return `
-    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("labelTrack"))}</div><div class="race-summary-value">${escapeHtml(getLocalizedField(item, "track_name", item?.track_name || "--"))}</div></div>
-    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("scheduleModalDateTime"))}</div><div class="race-summary-value">${escapeHtml(formatScheduleDateTime(item))}</div></div>
-    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("scheduleModalSlot"))}</div><div class="race-summary-value">${escapeHtml(getLocalizedField(item, "slot_label", item?.slot_label || "--"))}</div></div>
-    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("scheduleModalRain"))}</div><div class="race-summary-value">${escapeHtml(formatRainForecast(item))}</div></div>
-  `;
-}
 function buildScheduleModalDetails(item) {
   const server = announcementData?.server || {};
   const session = announcementData?.session || {};
   const rules = announcementData?.rules || {};
   const weather = item?.weather || announcementData?.weather || {};
   return `
-    <article class="schedule-detail-card schedule-detail-card-strong">
-      <div class="schedule-detail-label">${escapeHtml(t("heroServerLabel"))}</div>
-      <div class="schedule-detail-value">${escapeHtml(server.name || server.full_name || t("unknownValue"))}</div>
-    </article>
-    <article class="schedule-detail-card schedule-detail-card-strong">
-      <div class="schedule-detail-label">${escapeHtml(t("heroPasswordLabel"))}</div>
-      <div class="schedule-detail-value">${escapeHtml(server.password || t("passwordNone"))}</div>
-    </article>
-    <article class="schedule-detail-card">
-      <div class="schedule-detail-label">${escapeHtml(t("heroEntryLabel"))}</div>
-      <div class="schedule-detail-copy">${escapeHtml(buildEntryRules(server))}</div>
-    </article>
-    <article class="schedule-detail-card">
-      <div class="schedule-detail-label">${escapeHtml(t("heroFormatLabel"))}</div>
-      <div class="schedule-detail-copy">${escapeHtml(buildRaceFormat(session))}</div>
-    </article>
-    <article class="schedule-detail-card">
-      <div class="schedule-detail-label">${escapeHtml(t("heroPitstopLabel"))}</div>
-      <div class="schedule-detail-copy">${escapeHtml(buildPitstopRules(rules))}</div>
-    </article>
-    <article class="schedule-detail-card">
-      <div class="schedule-detail-label">${escapeHtml(t("heroMandatoryLabel"))}</div>
-      <div class="schedule-detail-copy">${escapeHtml(buildMandatoryActions(rules))}</div>
-    </article>
-    <article class="schedule-detail-card schedule-detail-card-weather">
-      <div class="schedule-detail-label">${escapeHtml(t("heroWeatherLabel"))}</div>
-      <div class="schedule-detail-value">${escapeHtml(buildWeatherSummary(weather))}</div>
-    </article>
+    <div class="schedule-modal-hero">
+      <div class="schedule-modal-vote">
+        ${buildVoteControls(item, "hero")}
+      </div>
+
+      <section class="hero-server-card schedule-modal-hero-pane">
+        <div class="hero-server-stack">
+          <div class="hero-server-grid hero-server-grid-rules">
+            <div class="hero-server-item">
+              <div class="label">${escapeHtml(t("heroPitstopLabel"))}</div>
+              <div class="value">${renderHeroTokenGroups(buildPitstopTokenGroups(rules))}</div>
+            </div>
+            <div class="hero-server-item">
+              <div class="label">${escapeHtml(t("heroRefuelLabel"))}</div>
+              <div class="value">${renderHeroTokenGroups(buildRefuelTokenGroups(rules))}</div>
+            </div>
+            <div class="hero-server-item">
+              <div class="label">${escapeHtml(t("heroTyresLabel"))}</div>
+              <div class="value">${renderHeroTokenGroups(buildTyreTokenGroups(rules))}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="hero-announcement-card schedule-modal-hero-pane">
+        <div class="hero-announcement-inline-meta">
+          <div class="stat hero-announcement-inline-stat hero-announcement-inline-stat-combined">
+            <div class="value">${renderHeroTokenGroups(buildEntryTokenGroups(server))}</div>
+            <div class="hero-announcement-inline-divider" aria-hidden="true"></div>
+            <div class="value">${renderHeroTokenGroups(buildRaceFormatTokenGroups(session))}</div>
+          </div>
+        </div>
+
+        <div class="hero-announcement-weather has-token-value">
+          <div class="value">${renderHeroTokenGroups(buildWeatherTokenGroups(weather))}</div>
+        </div>
+      </aside>
+    </div>
   `;
 }
 async function loadJson(url) {
@@ -969,15 +943,12 @@ function renderAnnouncement(data) {
     data.timezone || "UTC+3"
   );
 
-  setText("announcement-title", announcementTitle);
-  setText("announcement-status", getLocalizedField(data, "status", "--"));
   setText("announcement-date", formatDate(data.date));
   setText(
     "announcement-time",
     announcementTime === "--" ? announcementTime : `${announcementTime} ${announcementTimezone}`
   );
   setText("announcement-track", getLocalizedField(data, "track_name", data.track_name || "--"));
-  setText("announcement-duration", getLocalizedField(data, "server_window", data.server_window || "--"));
   applyHeroTrackBackground(data?.track_code);
 }
 function renderHeroDetails(data) {
@@ -1123,8 +1094,28 @@ function renderScheduleModal() {
   }
   applyScheduleModalTrackBackground(selectedScheduleItem.track_code);
   titleEl.textContent = getLocalizedField(selectedScheduleItem, "track_name", selectedScheduleItem.track_name || "--");
-  subtitleEl.textContent = formatScheduleDateTime(selectedScheduleItem);
+  const server = announcementData?.server || {};
+  const startTime = getLocalizedField(selectedScheduleItem, "start_time_local", selectedScheduleItem?.start_time_local || "--");
+  const timezone = getLocalizedField(selectedScheduleItem, "timezone", selectedScheduleItem?.timezone || "UTC+3");
+  const scheduleDateTime = `${formatDate(selectedScheduleItem?.date)} · ${`${startTime} ${timezone}`.trim()}`;
+  subtitleEl.innerHTML = `
+    <span class="schedule-modal-subtitle-grid">
+      <span class="schedule-modal-subtitle-card">
+        <span class="schedule-modal-subtitle-label">${escapeHtml(t("heroServerLabel"))}</span>
+        <span class="schedule-modal-subtitle-value">${escapeHtml(server.name || server.full_name || t("unknownValue"))}</span>
+      </span>
+      <span class="schedule-modal-subtitle-card">
+        <span class="schedule-modal-subtitle-label">${escapeHtml(t("heroPasswordLabel"))}</span>
+        <span class="schedule-modal-subtitle-value">${escapeHtml(server.password || t("passwordNone"))}</span>
+      </span>
+      <span class="schedule-modal-subtitle-card">
+        <span class="schedule-modal-subtitle-label">${escapeHtml(`${t("labelDate")} + ${t("labelTime")}`)}</span>
+        <span class="schedule-modal-subtitle-value">${escapeHtml(formatDate(selectedScheduleItem?.date))}<br>${escapeHtml(`${startTime} ${timezone}`.trim())}</span>
+      </span>
+    </span>
+  `;
   detailsEl.innerHTML = buildScheduleModalDetails(selectedScheduleItem);
+  bindVoteControls(detailsEl);
 }
 function renderWeatherModal() {
   const detailsEl = document.getElementById("weather-modal-details");
@@ -1269,12 +1260,9 @@ function bindWeatherModal() {
 function renderErrorState() {
   document.getElementById("schedule-list").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
   document.getElementById("recent-races-table").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
-  setText("announcement-title", t("loadError"));
-  setText("announcement-status", "--");
   setText("announcement-date", "--");
   setText("announcement-time", "--");
   setText("announcement-track", "--");
-  setText("announcement-duration", "--");
   setText("hero-server-name", "--");
   setText("hero-server-password", "--");
   setText("hero-entry-rules", "--");

@@ -149,17 +149,6 @@
               </div>
             </div>
 
-            <div class="hero-server-grid hero-server-grid-minor">
-              <div class="hero-server-item">
-                <div class="label" data-i18n="heroEntryLabel">Entry</div>
-                <div class="value" id="hero-entry-rules">--</div>
-              </div>
-              <div class="hero-server-item">
-                <div class="label" data-i18n="heroFormatLabel">Format</div>
-                <div class="value" id="hero-race-format">--</div>
-              </div>
-            </div>
-
             <div class="hero-server-stack">
               <div class="hero-server-grid hero-server-grid-rules">
                 <div class="hero-server-item">
@@ -167,8 +156,12 @@
                   <div class="value" id="hero-pitstop-rules">--</div>
                 </div>
                 <div class="hero-server-item">
-                  <div class="label" data-i18n="heroMandatoryLabel">Mandatory</div>
-                  <div class="value" id="hero-mandatory-actions">--</div>
+                  <div class="label" data-i18n="heroRefuelLabel">Refuel</div>
+                  <div class="value" id="hero-refuel-rules">--</div>
+                </div>
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="heroTyresLabel">Tyres</div>
+                  <div class="value" id="hero-tyre-rules">--</div>
                 </div>
               </div>
             </div>
@@ -180,31 +173,30 @@
             <div class="hero-announcement-head">
               <div>
                 <div class="eyebrow hero-announcement-eyebrow" data-i18n="announcementEyebrow">Next Event</div>
-                <h2 id="announcement-title" data-i18n="loadingShort">Loading...</h2>
+              </div>
+            </div>
+
+            <div class="hero-announcement-inline-meta">
+              <div class="stat hero-announcement-stat-track">
+                <div class="value" id="announcement-track">--</div>
+              </div>
+              <div class="stat hero-announcement-inline-stat hero-announcement-inline-stat-combined">
+                <div class="value" id="hero-entry-rules">--</div>
+                <div class="hero-announcement-inline-divider" aria-hidden="true"></div>
+                <div class="value" id="hero-race-format">--</div>
               </div>
             </div>
 
             <div class="hero-announcement-meta">
-              <div class="stat">
-                <div class="label" data-i18n="labelDate">Date</div>
+              <div class="stat hero-announcement-stat-plain">
                 <div class="value" id="announcement-date">--</div>
               </div>
-              <div class="stat">
-                <div class="label" data-i18n="labelTime">Time</div>
+              <div class="stat hero-announcement-stat-plain">
                 <div class="value" id="announcement-time">--</div>
-              </div>
-              <div class="stat">
-                <div class="label" data-i18n="labelTrack">Track</div>
-                <div class="value" id="announcement-track">--</div>
-              </div>
-              <div class="stat">
-                <div class="label" data-i18n="labelWindow">Server Window</div>
-                <div class="value" id="announcement-duration">--</div>
               </div>
             </div>
 
-            <div class="hero-announcement-weather">
-              <div class="label" data-i18n="heroWeatherLabel">Weather</div>
+            <div class="hero-announcement-weather" id="hero-weather-card" tabindex="0" role="button" aria-haspopup="dialog">
               <div class="value" id="hero-weather">--</div>
             </div>
           </aside>
@@ -271,6 +263,20 @@
             <div class="empty" data-i18n="loadingShort">Loading...</div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="weather-modal" aria-hidden="true">
+      <div class="modal-card modal-card-weather" role="dialog" aria-modal="true" aria-labelledby="weather-modal-title">
+        <button class="modal-close" id="weather-modal-close" type="button" aria-label="Close" data-i18n-aria-label="closeLabel">✕</button>
+        <div class="modal-header">
+          <div>
+            <div class="eyebrow" data-i18n="weatherModalEyebrow">Weather details</div>
+            <h3 id="weather-modal-title" class="modal-title" data-i18n="weatherModalTitle">Race weather</h3>
+            <p class="modal-subtitle" id="weather-modal-subtitle" data-i18n="weatherModalSubtitle">Tap any indicator to understand what it means.</p>
+          </div>
+        </div>
+        <div class="weather-modal-details" id="weather-modal-details"></div>
       </div>
     </div>
   </main>

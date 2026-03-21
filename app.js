@@ -29,6 +29,8 @@ const translations = {
     heroFormatLabel: "Format",
     heroPitstopLabel: "Pitstop",
     heroMandatoryLabel: "Mandatory",
+    heroRefuelLabel: "Refuel",
+    heroTyresLabel: "Tyres",
     heroWeatherLabel: "Weather",
     copyAction: "Copy {field}",
     copiedAction: "{field} copied",
@@ -69,6 +71,7 @@ const translations = {
     entryRacecraft: "RC {value}+",
     preRaceWait: "Prestart {value}m",
     overtime: "Overtime {value}m",
+    timeMultiplierChip: "x{value} time",
     mandatoryPitstopCount: "{value} mandatory stop",
     mandatoryPitstopCountPlural: "{value} mandatory stops",
     pitWindow: "window {value}m",
@@ -79,6 +82,11 @@ const translations = {
     mandatoryTyres: "tyre change",
     mandatoryDriverSwap: "driver swap",
     mandatoryNone: "No mandatory service actions",
+    refuelMandatory: "mandatory refuel",
+    refuelNone: "no refuel rules",
+    tyresMandatory: "mandatory tyre change",
+    tyresSets: "{value} sets",
+    tyresNone: "no tyre rules",
     passwordNone: "No password",
     weatherClear: "Clear",
     weatherMixed: "Mixed clouds",
@@ -88,6 +96,17 @@ const translations = {
     weatherClouds: "clouds {value}%",
     weatherRain: "rain {value}%",
     weatherRandomness: "randomness {value}",
+    weatherTempHintTitle: "Ambient temperature",
+    weatherTempHintBody: "Air temperature around the session start: {value}C. It affects tyre warm-up and overall grip.",
+    weatherCloudsHintTitle: "Cloud cover",
+    weatherCloudsHintBody: "{value}% cloud cover expected for this slot. More clouds usually mean a cooler, flatter track.",
+    weatherRainHintTitle: "Rain chance",
+    weatherRainHintBody: "{value}% rain probability for this slot. Higher values mean a greater chance of wet conditions.",
+    weatherRandomHintTitle: "Weather randomness",
+    weatherRandomHintBody: "Randomness level {value}. Higher values make the weather less predictable during the event.",
+    weatherModalEyebrow: "Weather details",
+    weatherModalTitle: "Race weather",
+    weatherModalSubtitle: "Tap any indicator to understand what it means.",
     unknownValue: "--",
     racesTableTitle: "Race Results",
     racesTableSubtitle: "Click any row to open the finishing order.",
@@ -127,6 +146,8 @@ const translations = {
     heroFormatLabel: "Формат",
     heroPitstopLabel: "Пит-стоп",
     heroMandatoryLabel: "Обязательно",
+    heroRefuelLabel: "Заправка",
+    heroTyresLabel: "Шины",
     heroWeatherLabel: "Погода",
     announcementEyebrow: "Ближайший старт",
     scheduleEyebrow: "План",
@@ -149,16 +170,22 @@ const translations = {
     entryRacecraft: "RC {value}+",
     preRaceWait: "Престарт {value}м",
     overtime: "Овертайм {value}м",
-    mandatoryPitstopCount: "{value} обязательный пит-стоп",
+    timeMultiplierChip: "x{value} время",
+    mandatoryPitstopCount: "{value} обязательный пит",
     mandatoryPitstopCountPlural: "{value} обязательных пит-стопа",
     pitWindow: "окно {value}м",
     pitNoMandatory: "Без обязательного пит-стопа",
     pitRefuelAllowed: "дозаправка разрешена",
-    pitRefuelFixed: "фиксированное время дозаправки",
+    pitRefuelFixed: "фикс. время дозаправки",
     mandatoryRefuel: "дозаправка",
     mandatoryTyres: "смена шин",
     mandatoryDriverSwap: "смена пилота",
     mandatoryNone: "Нет обязательных сервисных действий",
+    refuelMandatory: "обязат. дозаправка",
+    refuelNone: "без правил по заправке",
+    tyresMandatory: "обязат. смена шин",
+    tyresSets: "{value} компл.",
+    tyresNone: "без правил по шинам",
     passwordNone: "Без пароля",
     weatherClear: "Ясно",
     weatherMixed: "Переменная облачность",
@@ -168,6 +195,17 @@ const translations = {
     weatherClouds: "облачность {value}%",
     weatherRain: "дождь {value}%",
     weatherRandomness: "рандомность {value}",
+    weatherTempHintTitle: "Температура воздуха",
+    weatherTempHintBody: "Температура воздуха к началу сессии: {value}C. Она влияет на прогрев шин и общий уровень сцепления.",
+    weatherCloudsHintTitle: "Облачность",
+    weatherCloudsHintBody: "Ожидаемая облачность для этого слота: {value}%. Чем ее больше, тем прохладнее и ровнее покрытие.",
+    weatherRainHintTitle: "Вероятность дождя",
+    weatherRainHintBody: "Вероятность дождя для этого слота: {value}%. Чем выше значение, тем больше шанс влажной трассы.",
+    weatherRandomHintTitle: "Рандомность погоды",
+    weatherRandomHintBody: "Уровень рандомности: {value}. Чем он выше, тем менее предсказуемой будет погода по ходу ивента.",
+    weatherModalEyebrow: "Детали погоды",
+    weatherModalTitle: "Погода на гонку",
+    weatherModalSubtitle: "Нажми на показатель, чтобы понять, что именно он означает.",
     unknownValue: "--",
     racesTableTitle: "Результаты заездов",
     racesTableSubtitle: "Нажми на строку, чтобы открыть финишный протокол.",
@@ -232,6 +270,11 @@ const HERO_TRACK_BACKGROUNDS = {
   spa: "./assets/tracks/spa.jpg",
   nurburgring: "./assets/tracks/nurburgring.jpg"
 };
+const WEATHER_ICON_PATHS = {
+  clouds: "./assets/weather/cloudness.png",
+  rain: "./assets/weather/rain.png",
+  random: "./assets/weather/random.png"
+};
 const pendingVoteEventIds = new Set();
 
 function t(key) { return translations[currentLang]?.[key] ?? translations.en[key] ?? key; }
@@ -267,6 +310,10 @@ function getLocalizedField(item, key, fallback = "--") {
 function setText(id, value) {
   const element = document.getElementById(id);
   if (element) element.textContent = value || t("unknownValue");
+}
+function setHtml(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.innerHTML = value || escapeHtml(t("unknownValue"));
 }
 function compactJoin(parts) { return parts.filter(Boolean).join(" · "); }
 function setHeroCopyButtonLabel(button, copied = false) {
@@ -377,6 +424,155 @@ function buildWeatherSummary(weather) {
   if (rainPercent !== null) parts.push(tf("weatherRain", { value: rainPercent }));
   if (typeof weather.weather_randomness === "number") parts.push(tf("weatherRandomness", { value: weather.weather_randomness }));
   return compactJoin(parts) || t("unknownValue");
+}
+function createHeroToken(label, tone = "default", icon = "", tooltipTitle = "", tooltipBody = "") {
+  return { label, tone, icon, tooltipTitle, tooltipBody };
+}
+function renderHeroTokenGroups(groups) {
+  const tokens = (groups || [])
+    .flatMap(group => (group || []).filter(token => token && token.label));
+  const normalizedTokens = tokens.length ? tokens : [createHeroToken(t("unknownValue"), "muted")];
+  return `<div class="hero-token-list">${normalizedTokens
+    .map(token => {
+      const hasTooltip = token.tooltipTitle || token.tooltipBody;
+      return `<span class="hero-token hero-token-${escapeHtml(token.tone || "default")}${hasTooltip ? " hero-token-has-tooltip" : ""}"${hasTooltip ? ' tabindex="0"' : ""}>${token.icon ? `<img class="hero-token-icon" src="${escapeHtml(token.icon)}" alt="" aria-hidden="true" />` : ""}<span class="hero-token-text">${escapeHtml(token.label)}</span>${hasTooltip ? `<span class="hero-token-tooltip" role="tooltip">${token.icon ? `<img class="hero-token-tooltip-icon" src="${escapeHtml(token.icon)}" alt="" aria-hidden="true" />` : ""}<span class="hero-token-tooltip-copy"><span class="hero-token-tooltip-title">${escapeHtml(token.tooltipTitle || token.label)}</span>${token.tooltipBody ? `<span class="hero-token-tooltip-body">${escapeHtml(token.tooltipBody)}</span>` : ""}</span></span>` : ""}</span>`;
+    })
+    .join("")}</div>`;
+}
+function setHeroTokenValue(id, groups) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  element.innerHTML = renderHeroTokenGroups(groups);
+  const card = element.closest(".hero-server-item, .hero-announcement-weather");
+  if (card) card.classList.add("has-token-value");
+}
+function buildEntryTokenGroups(server) {
+  if (!server || typeof server !== "object") return [];
+  const tokens = [];
+  if (server.car_group) tokens.push(createHeroToken(server.car_group, "primary"));
+  if (typeof server.max_car_slots === "number" && server.max_car_slots > 0) tokens.push(createHeroToken(tf("entrySlots", { value: server.max_car_slots }), "default"));
+  if (typeof server.safety_rating_requirement === "number" && server.safety_rating_requirement > 0) tokens.push(createHeroToken(tf("entrySafety", { value: server.safety_rating_requirement }), "muted"));
+  if (typeof server.track_medals_requirement === "number" && server.track_medals_requirement > 0) tokens.push(createHeroToken(tf("entryTrackMedals", { value: server.track_medals_requirement }), "muted"));
+  if (typeof server.racecraft_rating_requirement === "number" && server.racecraft_rating_requirement > 0) tokens.push(createHeroToken(tf("entryRacecraft", { value: server.racecraft_rating_requirement }), "muted"));
+  return [tokens];
+}
+function buildRaceFormatTokenGroups(session) {
+  if (!session || typeof session !== "object") return [];
+  const primary = [];
+  const secondary = [];
+  if (typeof session.qualifying_duration_minutes === "number" && session.qualifying_duration_minutes > 0) primary.push(createHeroToken(`Q ${session.qualifying_duration_minutes}m`, "primary"));
+  if (typeof session.race_duration_minutes === "number" && session.race_duration_minutes > 0) primary.push(createHeroToken(`R ${session.race_duration_minutes}m`, "primary"));
+  if (!primary.length && session.format_label) {
+    session.format_label.split(" + ").map(part => part.trim()).filter(Boolean).forEach(part => primary.push(createHeroToken(part, "primary")));
+  }
+  if (typeof session.time_multiplier === "number" && session.time_multiplier > 1) secondary.push(createHeroToken(tf("timeMultiplierChip", { value: session.time_multiplier }), "muted"));
+  return [primary, secondary];
+}
+function buildPitstopTokenGroups(rules) {
+  if (!rules || typeof rules !== "object") return [];
+  const primary = [createHeroToken(formatMandatoryPitstopCount(rules.mandatory_pitstop_count), rules.mandatory_pitstop_count > 0 ? "primary" : "muted")];
+  const secondary = [];
+  if (typeof rules.pit_window_length_minutes === "number" && rules.pit_window_length_minutes > 0) secondary.push(createHeroToken(tf("pitWindow", { value: rules.pit_window_length_minutes }), "default"));
+  return [primary, secondary];
+}
+function buildRefuelTokenGroups(rules) {
+  if (!rules || typeof rules !== "object") return [];
+  const primary = [];
+  if (rules.refuelling_allowed_in_race) primary.push(createHeroToken(t("pitRefuelAllowed"), "default"));
+  if (rules.refuelling_time_fixed) primary.push(createHeroToken(t("pitRefuelFixed"), "muted"));
+  if (rules.mandatory_pitstop_refuelling_required) primary.push(createHeroToken(t("refuelMandatory"), "primary"));
+  if (!primary.length) primary.push(createHeroToken(t("refuelNone"), "muted"));
+  return [primary];
+}
+function buildTyreTokenGroups(rules) {
+  if (!rules || typeof rules !== "object") return [];
+  const primary = [];
+  if (rules.mandatory_pitstop_tyre_change_required) primary.push(createHeroToken(t("tyresMandatory"), "primary"));
+  if (typeof rules.tyre_set_count === "number" && rules.tyre_set_count > 0) primary.push(createHeroToken(tf("tyresSets", { value: rules.tyre_set_count }), "muted"));
+  if (!primary.length) primary.push(createHeroToken(t("tyresNone"), "muted"));
+  return [primary];
+}
+function buildWeatherTokenGroups(weather) {
+  if (!weather || typeof weather !== "object") return [];
+  const primary = [];
+  const secondary = [];
+  if (typeof weather.ambient_temp_c === "number") {
+    primary.push(createHeroToken(
+      tf("weatherTemp", { value: weather.ambient_temp_c }),
+      "default",
+      "",
+      t("weatherTempHintTitle"),
+      tf("weatherTempHintBody", { value: weather.ambient_temp_c })
+    ));
+  }
+  const cloudPercent = percentValue(weather.cloud_level);
+  if (cloudPercent !== null) {
+    secondary.push(createHeroToken(
+      `${cloudPercent}%`,
+      "muted",
+      WEATHER_ICON_PATHS.clouds,
+      t("weatherCloudsHintTitle"),
+      tf("weatherCloudsHintBody", { value: cloudPercent })
+    ));
+  }
+  const rainPercent = percentValue(weather.rain_level);
+  if (rainPercent !== null) {
+    secondary.push(createHeroToken(
+      `${rainPercent}%`,
+      "muted",
+      WEATHER_ICON_PATHS.rain,
+      t("weatherRainHintTitle"),
+      tf("weatherRainHintBody", { value: rainPercent })
+    ));
+  }
+  if (typeof weather.weather_randomness === "number") {
+    secondary.push(createHeroToken(
+      String(weather.weather_randomness),
+      "muted",
+      WEATHER_ICON_PATHS.random,
+      t("weatherRandomHintTitle"),
+      tf("weatherRandomHintBody", { value: weather.weather_randomness })
+    ));
+  }
+  return [primary, secondary];
+}
+function buildWeatherModalCards(weather) {
+  const cards = [];
+  if (typeof weather?.ambient_temp_c === "number") {
+    cards.push({
+      icon: "",
+      value: tf("weatherTemp", { value: weather.ambient_temp_c }),
+      title: t("weatherTempHintTitle"),
+      body: tf("weatherTempHintBody", { value: weather.ambient_temp_c })
+    });
+  }
+  const cloudPercent = percentValue(weather?.cloud_level);
+  if (cloudPercent !== null) {
+    cards.push({
+      icon: WEATHER_ICON_PATHS.clouds,
+      value: `${cloudPercent}%`,
+      title: t("weatherCloudsHintTitle"),
+      body: tf("weatherCloudsHintBody", { value: cloudPercent })
+    });
+  }
+  const rainPercent = percentValue(weather?.rain_level);
+  if (rainPercent !== null) {
+    cards.push({
+      icon: WEATHER_ICON_PATHS.rain,
+      value: `${rainPercent}%`,
+      title: t("weatherRainHintTitle"),
+      body: tf("weatherRainHintBody", { value: rainPercent })
+    });
+  }
+  if (typeof weather?.weather_randomness === "number") {
+    cards.push({
+      icon: WEATHER_ICON_PATHS.random,
+      value: String(weather.weather_randomness),
+      title: t("weatherRandomHintTitle"),
+      body: tf("weatherRandomHintBody", { value: weather.weather_randomness })
+    });
+  }
+  return cards;
 }
 function formatRainForecast(item) {
   const rainLevel =
@@ -793,11 +989,12 @@ function renderHeroDetails(data) {
   const weather = data?.weather || {};
   setText("hero-server-name", server.name || server.full_name || t("unknownValue"));
   setText("hero-server-password", server.password || t("passwordNone"));
-  setText("hero-entry-rules", buildEntryRules(server));
-  setText("hero-race-format", buildRaceFormat(session));
-  setText("hero-pitstop-rules", buildPitstopRules(rules));
-  setText("hero-mandatory-actions", buildMandatoryActions(rules));
-  setText("hero-weather", buildWeatherSummary(weather));
+  setHeroTokenValue("hero-entry-rules", buildEntryTokenGroups(server));
+  setHeroTokenValue("hero-race-format", buildRaceFormatTokenGroups(session));
+  setHeroTokenValue("hero-pitstop-rules", buildPitstopTokenGroups(rules));
+  setHeroTokenValue("hero-refuel-rules", buildRefuelTokenGroups(rules));
+  setHeroTokenValue("hero-tyre-rules", buildTyreTokenGroups(rules));
+  setHeroTokenValue("hero-weather", buildWeatherTokenGroups(weather));
 }
 function renderSchedule(rows) {
   const container = document.getElementById("schedule-list");
@@ -931,6 +1128,26 @@ function renderScheduleModal() {
   subtitleEl.textContent = formatScheduleDateTime(selectedScheduleItem);
   detailsEl.innerHTML = buildScheduleModalDetails(selectedScheduleItem);
 }
+function renderWeatherModal() {
+  const detailsEl = document.getElementById("weather-modal-details");
+  if (!detailsEl) return;
+  const weather = announcementData?.weather || {};
+  const cards = buildWeatherModalCards(weather);
+  if (!cards.length) {
+    detailsEl.innerHTML = `<div class="empty">${escapeHtml(t("unknownValue"))}</div>`;
+    return;
+  }
+  detailsEl.innerHTML = cards.map(card => `
+    <article class="weather-detail-card">
+      <div class="weather-detail-head">
+        ${card.icon ? `<img class="weather-detail-icon" src="${escapeHtml(card.icon)}" alt="" aria-hidden="true" />` : `<div class="weather-detail-value weather-detail-value-plain">${escapeHtml(card.value)}</div>`}
+        ${card.icon ? `<div class="weather-detail-value">${escapeHtml(card.value)}</div>` : ""}
+      </div>
+      <div class="weather-detail-title">${escapeHtml(card.title)}</div>
+      <div class="weather-detail-body">${escapeHtml(card.body)}</div>
+    </article>
+  `).join("");
+}
 function openModal() {
   const modal = document.getElementById("race-results-modal");
   if (!modal) return;
@@ -947,6 +1164,14 @@ function openScheduleModal(item) {
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
   renderScheduleModal();
+}
+function openWeatherModal() {
+  const modal = document.getElementById("weather-modal");
+  if (!modal) return;
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  renderWeatherModal();
 }
 function closeModal() {
   const modal = document.getElementById("race-results-modal");
@@ -965,6 +1190,13 @@ function closeScheduleModal() {
   document.body.classList.remove("modal-open");
   selectedScheduleItem = null;
   applyScheduleModalTrackBackground("");
+}
+function closeWeatherModal() {
+  const modal = document.getElementById("weather-modal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
 }
 async function loadRaceDetails(race) {
   if (!race?.details_path) return race;
@@ -1011,7 +1243,30 @@ function bindRaceModal() {
     if (event.key !== "Escape") return;
     if (document.getElementById("schedule-modal")?.classList.contains("is-open")) closeScheduleModal();
     if (document.getElementById("race-results-modal")?.classList.contains("is-open")) closeModal();
+    if (document.getElementById("weather-modal")?.classList.contains("is-open")) closeWeatherModal();
   });
+}
+function bindWeatherModal() {
+  const modal = document.getElementById("weather-modal");
+  const closeButton = document.getElementById("weather-modal-close");
+  const trigger = document.getElementById("hero-weather-card");
+  if (closeButton) closeButton.addEventListener("click", closeWeatherModal);
+  if (modal) {
+    modal.addEventListener("click", event => { if (event.target === modal) closeWeatherModal(); });
+  }
+  if (trigger) {
+    const openIfMobile = () => {
+      if (!window.matchMedia("(max-width: 720px)").matches) return;
+      openWeatherModal();
+    };
+    trigger.addEventListener("click", openIfMobile);
+    trigger.addEventListener("keydown", event => {
+      if ((event.key === "Enter" || event.key === " ") && window.matchMedia("(max-width: 720px)").matches) {
+        event.preventDefault();
+        openWeatherModal();
+      }
+    });
+  }
 }
 function renderErrorState() {
   document.getElementById("schedule-list").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
@@ -1027,7 +1282,8 @@ function renderErrorState() {
   setText("hero-entry-rules", "--");
   setText("hero-race-format", "--");
   setText("hero-pitstop-rules", "--");
-  setText("hero-mandatory-actions", "--");
+  setText("hero-refuel-rules", "--");
+  setText("hero-tyre-rules", "--");
   setText("hero-weather", "--");
   applyHeroTrackBackground("");
 }
@@ -1157,6 +1413,7 @@ async function init() {
   bindTopNavMoreMenu();
   bindScheduleModal();
   bindRaceModal();
+  bindWeatherModal();
   renderUI();
   try {
     const [announcement, schedule, recentRaces] = await Promise.all([loadJson(announcementUrl), loadJson(scheduleUrl), loadJson(recentRacesUrl)]);

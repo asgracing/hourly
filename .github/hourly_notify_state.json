@@ -8,7 +8,9 @@
       }
     },
     "hourly_2026-03-21_1400_silverstone": {
-      "sent": {}
+      "sent": {
+        "2h": "2026-03-21T09:00:15+00:00"
+      }
     }
   },
   "last_event_id": "hourly_2026-03-21_1400_silverstone"

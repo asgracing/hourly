@@ -459,14 +459,12 @@ function buildEntryTokenGroups(server) {
 function buildRaceFormatTokenGroups(session) {
   if (!session || typeof session !== "object") return [];
   const primary = [];
-  const secondary = [];
   if (typeof session.qualifying_duration_minutes === "number" && session.qualifying_duration_minutes > 0) primary.push(createHeroToken(`Q ${session.qualifying_duration_minutes}m`, "primary"));
   if (typeof session.race_duration_minutes === "number" && session.race_duration_minutes > 0) primary.push(createHeroToken(`R ${session.race_duration_minutes}m`, "primary"));
   if (!primary.length && session.format_label) {
     session.format_label.split(" + ").map(part => part.trim()).filter(Boolean).forEach(part => primary.push(createHeroToken(part, "primary")));
   }
-  if (typeof session.time_multiplier === "number" && session.time_multiplier > 1) secondary.push(createHeroToken(tf("timeMultiplierChip", { value: session.time_multiplier }), "muted"));
-  return [primary, secondary];
+  return [primary];
 }
 function buildPitstopTokenGroups(rules) {
   if (!rules || typeof rules !== "object") return [];

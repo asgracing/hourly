@@ -66,19 +66,36 @@
 <body id="top">
   <nav class="top-nav" id="top-nav">
     <div class="top-nav-inner">
-      <a class="top-nav-brand" href="https://asgracing.github.io/top/" aria-label="ASG Racing home">ASG Racing</a>
+      <a class="top-nav-brand" href="https://asgracing.github.io/top/" aria-label="ASG Racing home" data-i18n-aria-label="homeAriaLabel">ASG Racing</a>
+      <div class="top-nav-socials">
+        <a class="top-nav-link-primary nav-social nav-social-discord" href="https://discord.gg/cEPFHXXtTC" target="_blank" rel="noopener noreferrer">Discord</a>
+        <a class="top-nav-link-primary nav-social nav-social-telegram" href="https://t.me/+JUymrENgddcyMTdi" target="_blank" rel="noopener noreferrer">Telegram</a>
+      </div>
       <div class="top-nav-center">
         <div class="top-nav-menu">
-          <a class="top-nav-link-primary nav-social nav-social-discord" href="https://discord.gg/cEPFHXXtTC" target="_blank" rel="noopener noreferrer">Discord</a>
-          <a class="top-nav-link-primary nav-social nav-social-telegram" href="https://t.me/+JUymrENgddcyMTdi" target="_blank" rel="noopener noreferrer">Telegram</a>
-          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard">Leaderboard</a>
-          <a class="top-nav-link-secondary" href="#schedule" data-i18n="navUpcoming">Upcoming Slots</a>
-          <a class="top-nav-link-secondary" href="#recent-races" data-i18n="navRaceResults">Race Results</a>
-          <a class="top-nav-link-secondary is-current" href="#top" data-i18n="navHourly">Hourly Race</a>
+          <a class="top-nav-link-secondary" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard" data-nav-item="true">Leaderboard</a>
+          <a class="top-nav-link-secondary" href="#schedule" data-i18n="navUpcoming" data-nav-item="true">Upcoming Slots</a>
+          <a class="top-nav-link-secondary" href="#recent-races" data-i18n="navRaceResults" data-nav-item="true">Race Results</a>
+          <a class="top-nav-link-secondary is-current" href="#top" data-i18n="navHourly" data-nav-item="true">Hourly Race</a>
+          <div class="top-nav-more" id="top-nav-more">
+            <button
+              class="top-nav-link-secondary top-nav-more-toggle"
+              id="top-nav-more-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-label="Open extra navigation"
+              data-i18n-aria-label="navMoreAriaLabel"
+            >
+              <span class="top-nav-more-icon" aria-hidden="true">☰</span>
+              <span class="top-nav-more-text" data-i18n="navMore">More</span>
+            </button>
+            <div class="top-nav-more-menu" id="top-nav-more-menu" hidden></div>
+          </div>
         </div>
       </div>
       <div class="top-nav-actions">
-        <div class="lang-switch top-nav-lang" aria-label="Language switcher">
+        <div class="lang-switch top-nav-lang" aria-label="Language switcher" data-i18n-aria-label="langSwitcherLabel">
           <button class="lang-btn" type="button" data-lang="en"><span class="lang-flag">🇬🇧</span><span class="lang-text">EN</span></button>
           <button class="lang-btn" type="button" data-lang="ru"><span class="lang-flag">🇷🇺</span><span class="lang-text">RU</span></button>
         </div>

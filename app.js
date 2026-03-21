@@ -8,6 +8,10 @@ const votesApiBase =
 const translations = {
   en: {
     htmlLang: "en",
+    homeAriaLabel: "ASG Racing home",
+    langSwitcherLabel: "Language switcher",
+    navMore: "More",
+    navMoreAriaLabel: "Open extra navigation",
     pageTitle: "Hourly Race | ASG Racing",
     metaDescription: "Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server.",
     ogTitle: "Hourly Race | ASG Racing",
@@ -15,9 +19,9 @@ const translations = {
     twitterTitle: "Hourly Race | ASG Racing",
     twitterDescription: "Schedule, latest announcement and recent races for the dedicated ASG Racing hourly server.",
     ogLocale: "en_US",
-    navLeaderboard: "Back to Public Leaderboard",
-    navUpcoming: "Upcoming Slots",
-    navRaceResults: "Race Results",
+    navLeaderboard: "Back to Main",
+    navUpcoming: "Events",
+    navRaceResults: "Results",
     navHourly: "Hourly Race",
     heroServerLabel: "Server",
     heroPasswordLabel: "Password",
@@ -109,7 +113,11 @@ const translations = {
     twitterTitle: "Часовая гонка | ASG Racing",
     twitterDescription: "Расписание, ближайший анонс и последние заезды отдельного сервера ASG Racing для часовых гонок.",
     ogLocale: "ru_RU",
-    navLeaderboard: "Лидерборд",
+    homeAriaLabel: "Главная ASG Racing",
+    langSwitcherLabel: "Переключение языка",
+    navMore: "Еще",
+    navMoreAriaLabel: "Открыть дополнительную навигацию",
+    navLeaderboard: "На главную",
     navLastRaces: "Последние гонки",
     navCars: "Машины",
     navHourly: "Часовая гонка",
@@ -179,9 +187,9 @@ const translations = {
 };
 
 Object.assign(translations.ru, {
-  navLeaderboard: "Назад к Public Leaderboard",
-  navUpcoming: "Предстоящие события",
-  navRaceResults: "Результаты заездов",
+  navLeaderboard: "На главную",
+  navUpcoming: "События",
+  navRaceResults: "Результаты",
   scheduleTableSubtitle: "Нажми на строку, чтобы открыть детали слота.",
   scheduleCols: ["Дата + UTC", "Трасса", "Дождь"],
   openScheduleDetailsLabel: "Открыть детали слота",
@@ -744,6 +752,7 @@ function applyTranslations() {
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
+  document.getElementById("top-nav-more")?.rebuildOverflowMenu?.();
 }
 
 function renderAnnouncement(data) {
@@ -1047,9 +1056,105 @@ function bindLanguageButtons() {
     });
   });
 }
+
+function bindTopNavMoreMenu() {
+  const root = document.getElementById("top-nav-more");
+  const toggle = document.getElementById("top-nav-more-toggle");
+  const menu = document.getElementById("top-nav-more-menu");
+  const navMenu = document.querySelector(".top-nav-menu");
+  const items = navMenu ? [...navMenu.querySelectorAll("[data-nav-item='true']")] : [];
+  if (!root || !toggle || !menu || !navMenu || !items.length || root.dataset.bound === "true") return;
+
+  const closeMenu = () => {
+    toggle.setAttribute("aria-expanded", "false");
+    menu.hidden = true;
+    root.classList.remove("is-open");
+  };
+
+  const rebuildOverflowMenu = () => {
+    menu.innerHTML = "";
+    items.forEach(item => {
+      item.hidden = false;
+    });
+
+    root.classList.remove("is-visible");
+    closeMenu();
+
+    if (window.innerWidth > 980) {
+      return;
+    }
+
+    root.classList.add("is-visible");
+    root.hidden = false;
+
+    const availableWidth = navMenu.clientWidth;
+    const toggleWidth = root.offsetWidth || toggle.getBoundingClientRect().width;
+    const gap = 8;
+    const maxVisibleRight = Math.max(0, availableWidth - toggleWidth - gap);
+
+    items.forEach(item => {
+      item.hidden = false;
+    });
+
+    items.forEach(item => {
+      const itemRightEdge = item.offsetLeft + item.offsetWidth;
+      if (itemRightEdge > maxVisibleRight) {
+        item.hidden = true;
+      }
+    });
+
+    const hiddenItems = items.filter(item => item.hidden);
+    if (!hiddenItems.length) {
+      root.classList.remove("is-visible");
+      root.hidden = true;
+      return;
+    }
+
+    hiddenItems.forEach(item => {
+      const clone = item.cloneNode(true);
+      clone.className = "top-nav-more-link";
+      clone.hidden = false;
+      clone.removeAttribute("data-nav-item");
+      menu.appendChild(clone);
+    });
+  };
+
+  const openMenu = () => {
+    toggle.setAttribute("aria-expanded", "true");
+    menu.hidden = false;
+    root.classList.add("is-open");
+  };
+
+  toggle.addEventListener("click", event => {
+    event.preventDefault();
+    if (menu.hidden) openMenu();
+    else closeMenu();
+  });
+
+  document.addEventListener("click", event => {
+    if (!root.contains(event.target)) closeMenu();
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeMenu();
+  });
+
+  menu.addEventListener("click", event => {
+    if (event.target.closest("a")) closeMenu();
+  });
+
+  window.addEventListener("resize", rebuildOverflowMenu);
+
+  requestAnimationFrame(rebuildOverflowMenu);
+  window.addEventListener("load", rebuildOverflowMenu, { once: true });
+  root.rebuildOverflowMenu = rebuildOverflowMenu;
+  root.dataset.bound = "true";
+}
+
 async function init() {
   currentLang = resolveInitialLanguage();
   bindLanguageButtons();
+  bindTopNavMoreMenu();
   bindScheduleModal();
   bindRaceModal();
   renderUI();

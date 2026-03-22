@@ -269,10 +269,11 @@ body {
 .lang-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-width: 72px;
+  justify-content: center;
+  gap: 0;
+  min-width: 56px;
   height: 42px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
@@ -295,32 +296,21 @@ body {
 }
 
 .lang-flag {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
   line-height: 1;
 }
 
-.lang-text {
-  line-height: 1;
-}
-
-.lang-btn[data-lang="en"] .lang-flag,
-.lang-btn[data-lang="ru"] .lang-flag {
-  font-size: 0;
-}
-
-.lang-btn[data-lang="en"] .lang-flag::after,
-.lang-btn[data-lang="ru"] .lang-flag::after {
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 800;
-}
-
-.lang-btn[data-lang="en"] .lang-flag::after {
-  content: "GB";
-}
-
-.lang-btn[data-lang="ru"] .lang-flag::after {
-  content: "RU";
+.lang-flag img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 .page {
@@ -1848,9 +1838,6 @@ body.modal-open {
     font-size: 0.84rem;
   }
 
-  .lang-text {
-    display: none;
-  }
 }
 
 @media (max-width: 840px) and (min-width: 721px) {
@@ -2112,6 +2099,11 @@ body.modal-open {
     min-width: 45px;
     min-height: 34px;
     padding: 0 7px;
+  }
+
+  .lang-flag {
+    width: 24px;
+    height: 17px;
   }
 
   .nav-social {

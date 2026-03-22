@@ -112,10 +112,12 @@ def build_details_url(item):
     return f"{HOURLY_PAGE_URL}{details_url.lstrip('./')}"
 
 
-def build_track_image_url(item):
+def build_track_image_url(item, channel="default"):
     track_code = normalize_event_id(item.get("track_code") or item.get("track_name"))
     if track_code not in SUPPORTED_TRACK_IMAGES:
         return ""
+    if channel == "telegram" and track_code == "monza":
+        return f"{TRACK_IMAGE_BASE_URL}/monzaTG.jpg"
     return f"{TRACK_IMAGE_BASE_URL}/{track_code}.jpg"
 
 
@@ -417,7 +419,7 @@ def dispatch(item, trigger_key):
     telegram_sent = False
     discord_sent = False
 
-    track_image_url = build_track_image_url(item)
+    track_image_url = build_track_image_url(item, channel="telegram")
     if track_image_url:
         try:
             telegram_sent = send_telegram_photo(build_photo_caption(item, trigger_key), track_image_url)

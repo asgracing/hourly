@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import subprocess
 import sys
 import threading
@@ -158,6 +159,15 @@ def resolve_run_mode(schedule_config: dict) -> tuple[int, str]:
     return default_duration, "normal"
 
 
+def resolve_publish_only_mode() -> bool:
+    cli_args = {arg.strip().lower() for arg in sys.argv[1:] if isinstance(arg, str)}
+    if "--publish-only" in cli_args or "publish-only" in cli_args:
+        return True
+
+    env_value = os.getenv("HOURLY_PUBLISH_ONLY", "").strip().lower()
+    return env_value in {"1", "true", "yes", "on"}
+
+
 def get_track_key(schedule_config: dict) -> str:
     return schedule_config.get("event_track_key") or "track"
 
@@ -245,6 +255,22 @@ def update_runtime_state_after_stop(runtime_state: dict):
     return runtime_state
 
 
+def update_runtime_state_publish_only(runtime_state: dict, event_config_path: Path, selected_track: dict, selected_slot: dict, planned_weather: dict):
+    runtime_state["last_track_code"] = selected_track.get("code")
+    runtime_state["last_event_config_path"] = str(event_config_path)
+    runtime_state["active_event_id"] = selected_slot.get("event_id")
+    runtime_state["last_planned_start_local"] = (
+        f"{selected_slot.get('date')}T{selected_slot.get('start_time_local')}:00+03:00"
+        if selected_slot.get("date") and selected_slot.get("start_time_local")
+        else None
+    )
+    runtime_state["last_planned_weather"] = planned_weather
+    runtime_state["last_status"] = "publish_only_completed"
+    runtime_state["last_error"] = None
+    runtime_state["updated_at"] = now_local_iso()
+    return runtime_state
+
+
 def apply_planned_weather(event_config: dict, planned_weather: dict):
     if not isinstance(planned_weather, dict):
         return event_config
@@ -324,6 +350,26 @@ def publish_git_if_needed(selected_track: dict):
     logging.info("Git publish completed successfully.")
 
 
+def run_publisher():
+    if not PUBLISHER_PATH.exists():
+        logging.warning("publisher.py not found at: %s", PUBLISHER_PATH)
+        return
+
+    logging.info("Running publisher: %s", PUBLISHER_PATH)
+    publisher_result = subprocess.run(
+        [resolve_python_executable(), str(PUBLISHER_PATH)],
+        cwd=str(APP_ROOT_DIR),
+        capture_output=True,
+        text=True,
+    )
+    if publisher_result.stdout.strip():
+        logging.info("Publisher stdout:\n%s", publisher_result.stdout.strip())
+    if publisher_result.stderr.strip():
+        logging.warning("Publisher stderr:\n%s", publisher_result.stderr.strip())
+    if publisher_result.returncode != 0:
+        raise RuntimeError(f"publisher.py failed with exit code {publisher_result.returncode}")
+
+
 def main():
     configure_logging()
 
@@ -332,7 +378,10 @@ def main():
         schedule_config = load_json(SCHEDULE_CONFIG_PATH)
         rotation_state = load_json(ROTATION_STATE_PATH)
         runtime_state = load_json(RUNTIME_STATE_PATH)
+        publish_only_mode = resolve_publish_only_mode()
         run_duration_seconds, run_mode = resolve_run_mode(schedule_config)
+        if publish_only_mode:
+            run_mode = "publish_only"
 
         _, selected_index = choose_next_track(schedule_config, rotation_state)
         schedule_items = planning.build_schedule_slots(schedule_config, rotation_state)
@@ -388,6 +437,25 @@ def main():
         runtime_state = update_runtime_state(runtime_state, event_config_path, selected_track, selected_slot, planned_weather)
         save_json(RUNTIME_STATE_PATH, runtime_state)
 
+        if publish_only_mode:
+            logging.info("Publish-only mode enabled. Skipping server launch and refreshing public schedule only.")
+            save_json(
+                ROTATION_STATE_PATH,
+                update_rotation_state(rotation_state, selected_track, selected_index, schedule_config["tracks"])
+            )
+            runtime_state = update_runtime_state_publish_only(
+                runtime_state,
+                event_config_path,
+                selected_track,
+                selected_slot,
+                planned_weather,
+            )
+            save_json(RUNTIME_STATE_PATH, runtime_state)
+            run_publisher()
+            publish_git_if_needed(selected_track)
+            logging.info("Hourly orchestrator completed successfully in publish-only mode.")
+            return
+
         process = subprocess.Popen(
             [str(server_exe_path)],
             cwd=str(server_exe_path.parent),
@@ -423,22 +491,7 @@ def main():
         runtime_state = update_runtime_state_with_results(runtime_state, q_files, r_files)
         save_json(RUNTIME_STATE_PATH, runtime_state)
 
-        if PUBLISHER_PATH.exists():
-            logging.info("Running publisher: %s", PUBLISHER_PATH)
-            publisher_result = subprocess.run(
-                [resolve_python_executable(), str(PUBLISHER_PATH)],
-                cwd=str(APP_ROOT_DIR),
-                capture_output=True,
-                text=True,
-            )
-            if publisher_result.stdout.strip():
-                logging.info("Publisher stdout:\n%s", publisher_result.stdout.strip())
-            if publisher_result.stderr.strip():
-                logging.warning("Publisher stderr:\n%s", publisher_result.stderr.strip())
-            if publisher_result.returncode != 0:
-                raise RuntimeError(f"publisher.py failed with exit code {publisher_result.returncode}")
-        else:
-            logging.warning("publisher.py not found at: %s", PUBLISHER_PATH)
+        run_publisher()
 
         logging.info("Reference event config: %s", REFERENCE_EVENT_PATH)
         logging.info("ACC event config: %s", event_config_path)

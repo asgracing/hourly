@@ -254,8 +254,26 @@ def get_trigger_label(trigger_key):
     return "test"
 
 
-def build_notification_title(item, trigger_key):
-    lead = get_trigger_label(trigger_key)
+def format_time_until_start(time_until_start):
+    if time_until_start is None:
+        return None
+
+    total_seconds = int(time_until_start.total_seconds())
+    if total_seconds <= 0:
+        return "now"
+
+    total_minutes = max(1, (total_seconds + 59) // 60)
+    hours, minutes = divmod(total_minutes, 60)
+    parts = []
+    if hours:
+        parts.append(f"{hours} hour" + ("" if hours == 1 else "s"))
+    if minutes:
+        parts.append(f"{minutes} minute" + ("" if minutes == 1 else "s"))
+    return " ".join(parts) if parts else "now"
+
+
+def build_notification_title(item, trigger_key, time_until_start=None):
+    lead = format_time_until_start(time_until_start) or get_trigger_label(trigger_key)
     track_name = item.get("track_name") or "Unknown track"
     if trigger_key == "15m":
         return f"Last call for {track_name} in {lead}"
@@ -264,16 +282,21 @@ def build_notification_title(item, trigger_key):
     return f"{track_name} starts in {lead}"
 
 
-def build_hype_line(trigger_key):
+def build_hype_line(trigger_key, time_until_start=None):
     prefix = "Take x5 points!"
+    lead = format_time_until_start(time_until_start)
     if trigger_key == "2h":
+        if lead:
+            return f"{prefix} {lead} to go. Time to finish prep, check the setup, and get ready for the race."
         return f"{prefix} Two hours to go. Time to finish prep, check the setup, and get ready for the race."
     if trigger_key == "15m":
+        if lead:
+            return f"{prefix} Server goes live in {lead}. Join now if you want to make the start."
         return f"{prefix} Server is about to go live. Join now if you want to make the start."
     return f"{prefix} Quick delivery check for the hourly notifier."
 
 
-def build_plain_message(item, trigger_key):
+def build_plain_message(item, trigger_key, time_until_start=None):
     track_name = item.get("track_name") or "Unknown track"
     start_time_local = str(item.get("start_time_local") or "--").strip()
     timezone_label = str(item.get("timezone") or "UTC").strip()
@@ -282,8 +305,8 @@ def build_plain_message(item, trigger_key):
     details_url = build_details_url(item)
 
     lines = [
-        build_notification_title(item, trigger_key),
-        build_hype_line(trigger_key),
+        build_notification_title(item, trigger_key, time_until_start),
+        build_hype_line(trigger_key, time_until_start),
         f"Track: {track_name}",
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
@@ -300,13 +323,13 @@ def build_plain_message(item, trigger_key):
     return "\n".join(lines)
 
 
-def build_photo_caption(item, trigger_key):
+def build_photo_caption(item, trigger_key, time_until_start=None):
     track_name = escape(str(item.get("track_name") or "Unknown track"))
     date_str = escape(format_display_date(item.get("date")))
     start_time_local = escape(str(item.get("start_time_local") or "--").strip())
     timezone_label = escape(str(item.get("timezone") or "UTC").strip())
-    title = escape(build_notification_title(item, trigger_key))
-    hype_line = escape(build_hype_line(trigger_key))
+    title = escape(build_notification_title(item, trigger_key, time_until_start))
+    hype_line = escape(build_hype_line(trigger_key, time_until_start))
     details_url = escape(build_details_url(item))
     registrations = item.get("registrations")
 
@@ -331,7 +354,7 @@ def build_photo_caption(item, trigger_key):
     return "\n".join(lines)
 
 
-def build_discord_payload(item, trigger_key):
+def build_discord_payload(item, trigger_key, time_until_start=None):
     track_name = str(item.get("track_name") or "Unknown track")
     date_str = format_display_date(item.get("date"))
     start_time_local = str(item.get("start_time_local") or "--").strip()
@@ -349,8 +372,8 @@ def build_discord_payload(item, trigger_key):
         fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
 
     embed = {
-        "title": build_notification_title(item, trigger_key),
-        "description": build_hype_line(trigger_key),
+        "title": build_notification_title(item, trigger_key, time_until_start),
+        "description": build_hype_line(trigger_key, time_until_start),
         "url": details_url,
         "color": 16748032,
         "fields": fields,
@@ -428,24 +451,27 @@ def send_discord_message(payload):
     return True
 
 
-def dispatch(item, trigger_key):
+def dispatch(item, trigger_key, time_until_start=None):
     telegram_sent = False
     discord_sent = False
 
     track_image_url = build_track_image_url(item, channel="telegram")
     if track_image_url:
         try:
-            telegram_sent = send_telegram_photo(build_photo_caption(item, trigger_key), track_image_url)
+            telegram_sent = send_telegram_photo(
+                build_photo_caption(item, trigger_key, time_until_start),
+                track_image_url,
+            )
         except error.HTTPError as exc:
             print(f"telegram photo failed: {exc.code} {exc.reason}; fallback to text")
         except Exception as exc:
             print(f"telegram photo failed: {exc}; fallback to text")
 
     if not telegram_sent:
-        telegram_sent = send_telegram_message(build_plain_message(item, trigger_key))
+        telegram_sent = send_telegram_message(build_plain_message(item, trigger_key, time_until_start))
 
     try:
-        discord_sent = send_discord_message(build_discord_payload(item, trigger_key))
+        discord_sent = send_discord_message(build_discord_payload(item, trigger_key, time_until_start))
     except error.HTTPError as exc:
         print(f"discord webhook failed: {exc.code} {exc.reason}; continue without Discord")
     except Exception as exc:
@@ -530,12 +556,12 @@ def run():
         if not is_due(time_until_start, trigger_config):
             continue
 
-        message = build_plain_message(announcement, trigger_key)
+        message = build_plain_message(announcement, trigger_key, time_until_start)
         if dry_run:
             print(f"[dry-run] would send {trigger_key} for {event_id}")
             print(message)
         else:
-            dispatch(announcement, trigger_key)
+            dispatch(announcement, trigger_key, time_until_start)
 
         event_state["sent"][trigger_key] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         sent_now.append(trigger_key)

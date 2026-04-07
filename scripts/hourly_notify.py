@@ -253,11 +253,12 @@ def build_notification_title(item, trigger_key):
 
 
 def build_hype_line(trigger_key):
+    prefix = "Take x5 points!"
     if trigger_key == "2h":
-        return "Two hours to go. Time to finish prep, check the setup, and get ready for the race."
+        return f"{prefix} Two hours to go. Time to finish prep, check the setup, and get ready for the race."
     if trigger_key == "15m":
-        return "Server is about to go live. Join now if you want to make the start."
-    return "Quick delivery check for the hourly notifier."
+        return f"{prefix} Server is about to go live. Join now if you want to make the start."
+    return f"{prefix} Quick delivery check for the hourly notifier."
 
 
 def build_plain_message(item, trigger_key):

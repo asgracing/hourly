@@ -1,6 +1,9 @@
 import hashlib
 import json
+import math
+import os
 import re
+import shutil
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -22,12 +25,15 @@ ANNOUNCEMENT_PATH = DATA_ROOT_DIR / "announcement.json"
 RECENT_RACES_PATH = DATA_ROOT_DIR / "recent_races.json"
 RACES_DIR = DATA_ROOT_DIR / "races"
 RACES_INDEX_PATH = RACES_DIR / "races.json"
+HOURLY_RESULTS_EXPORT_DIR = Path(os.getenv("HOURLY_RESULTS_EXPORT_DIR", r"\\192.168.1.100\acchourly"))
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 SCHEDULE_LOOKAHEAD_SLOTS = 3
 RECENT_RACES_LIMIT = 12
 INVALID_LAP_VALUES = {0, -1, 2147483647, 4294967295}
 POINTS_MAP = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
 BEST_LAP_BONUS = 1
+HOURLY_POINTS_MULTIPLIER = 5
+SCORING_BASE_MAX_POINTS = POINTS_MAP[1]
 CAR_MODEL_NAMES = {
     0: "Porsche 991 GT3 R", 1: "Mercedes-AMG GT3", 2: "Ferrari 488 GT3", 3: "Audi R8 LMS",
     4: "Lamborghini Huracan GT3", 5: "McLaren 650S GT3", 6: "Nissan GT-R Nismo GT3 2018",
@@ -51,6 +57,54 @@ def detect_text_encoding(raw: bytes) -> str:
     if raw.startswith(b"\xef\xbb\xbf"):
         return "utf-8-sig"
     return "utf-8"
+
+
+def normalize_points_value(value):
+    if value is None:
+        return 0
+
+    floor_value = math.floor(value)
+    fraction = value - floor_value
+
+    if fraction >= 0.6:
+        return floor_value + 1
+    return floor_value
+
+
+def resolve_max_points_for_participants(participant_count: int):
+    if participant_count >= 25:
+        return 25
+    if participant_count >= 20:
+        return 20
+    if participant_count >= 15:
+        return 15
+    if participant_count >= 10:
+        return 10
+    if participant_count >= 5:
+        return 5
+    return max(participant_count, 0)
+
+
+def calculate_scaled_points(base_points, participant_count: int):
+    if base_points <= 0 or participant_count <= 0:
+        return 0
+
+    max_points = resolve_max_points_for_participants(participant_count)
+    scale = max_points / SCORING_BASE_MAX_POINTS
+    return normalize_points_value(base_points * scale)
+
+
+def calculate_race_points(position: int, participant_count: int, has_best_lap: bool = False):
+    points = calculate_scaled_points(POINTS_MAP.get(position, 0), participant_count)
+    if has_best_lap:
+        points = normalize_points_value(points + BEST_LAP_BONUS)
+    return points
+
+
+def apply_points_multiplier(points: int, multiplier: int = HOURLY_POINTS_MULTIPLIER) -> int:
+    if not isinstance(multiplier, int) or multiplier <= 1:
+        return points
+    return normalize_points_value(points * multiplier)
 
 
 def load_json(path: Path, default=None):
@@ -645,6 +699,11 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
     race_best_lap_driver = None
     race_best_lap_public_id = None
     winner_total_time_ms = None
+    participant_count = sum(
+        1
+        for ordered in race_order
+        if (line_by_id.get(id(ordered["line"])) or {}).get("player_id")
+    )
     for position, ordered in enumerate(race_order, start=1):
         line = ordered["line"]
         item = line_by_id.get(id(line))
@@ -659,10 +718,15 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
         best_lap_ms = item["best_lap"]
         start_position = resolve_start_position(line, item["player_id"], qualifying_snapshot)
         positions_delta = start_position - position if isinstance(start_position, int) else None
-        points = POINTS_MAP.get(position, 0) if counted_for_stats else 0
         had_best_lap = best_lap_driver_id == item["player_id"]
-        if had_best_lap and counted_for_stats:
-            points += BEST_LAP_BONUS
+        points = (
+            apply_points_multiplier(
+                calculate_race_points(position, participant_count, had_best_lap),
+                HOURLY_POINTS_MULTIPLIER,
+            )
+            if counted_for_stats
+            else 0
+        )
         if position == 1:
             winner_name = item["display_name"]
             winner_public_id = make_public_driver_id(item["player_id"])
@@ -721,6 +785,9 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
         "server_name": data.get("serverName"),
         "meta_data": data.get("metaData"),
         "participants_count": len(participants),
+        "scoring_participants_count": participant_count,
+        "points_multiplier": HOURLY_POINTS_MULTIPLIER,
+        "points_rule": "scaled_by_participants_x5",
         "winner": winner_name,
         "winner_public_id": winner_public_id,
         "best_lap": race_best_lap,
@@ -765,6 +832,9 @@ def build_recent_races(results_dir_path: Path):
                 "finished_at": detail["finished_at"],
                 "finished_at_local": detail["finished_at_local"],
                 "participants_count": detail["participants_count"],
+                "scoring_participants_count": detail["scoring_participants_count"],
+                "points_multiplier": detail["points_multiplier"],
+                "points_rule": detail["points_rule"],
                 "winner": detail["winner"],
                 "winner_public_id": detail["winner_public_id"],
                 "best_lap": detail["best_lap"],
@@ -792,6 +862,50 @@ def save_race_details(race_details_payload: dict):
             path.unlink(missing_ok=True)
 
 
+def copy_today_result_files(results_dir_path: Path):
+    if not results_dir_path.exists():
+        print(f"Hourly result export skipped: results dir not found: {results_dir_path}")
+        return
+
+    if not HOURLY_RESULTS_EXPORT_DIR.exists():
+        print(f"Hourly result export skipped: destination not found: {HOURLY_RESULTS_EXPORT_DIR}")
+        return
+
+    today = now_local().date()
+    copied = 0
+    skipped = 0
+
+    for source_path in sorted(results_dir_path.glob("*.json")):
+        try:
+            source_stat = source_path.stat()
+            source_date = datetime.fromtimestamp(source_stat.st_mtime, tz=UTC_PLUS_3).date()
+            if source_date < today:
+                skipped += 1
+                continue
+
+            destination_path = HOURLY_RESULTS_EXPORT_DIR / source_path.name
+            should_copy = True
+            if destination_path.exists():
+                destination_stat = destination_path.stat()
+                should_copy = (
+                    int(source_stat.st_mtime) != int(destination_stat.st_mtime)
+                    or int(source_stat.st_size) != int(destination_stat.st_size)
+                )
+
+            if should_copy:
+                shutil.copy2(source_path, destination_path)
+                copied += 1
+            else:
+                skipped += 1
+        except Exception as exc:
+            print(f"Hourly result export warning: failed to copy {source_path}: {exc}")
+
+    print(
+        "Hourly result export complete: "
+        f"destination={HOURLY_RESULTS_EXPORT_DIR}, copied={copied}, skipped={skipped}"
+    )
+
+
 def main():
     schedule_config = load_json(SCHEDULE_CONFIG_PATH, default={}) or {}
     rotation_state = load_json(ROTATION_STATE_PATH, default={}) or {}
@@ -805,6 +919,7 @@ def main():
     schedule_data = {"items": schedule_items, "updated_at": now_local_iso()}
     announcement = build_announcement(schedule_data, schedule_config, settings_data, event_config, event_rules)
     recent_races_summary, recent_races_details = build_recent_races(results_dir_path)
+    copy_today_result_files(results_dir_path)
     save_json(ROTATION_STATE_PATH, rotation_state)
     save_json(RUNTIME_STATE_PATH, runtime_state)
     save_json(SCHEDULE_PATH, schedule_data)

@@ -12,7 +12,7 @@ DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement
 DEFAULT_SCHEDULE_URL = "https://asgracing.github.io/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
-DEFAULT_FINAL_WINDOW_MINUTES = 5
+DEFAULT_FINAL_WINDOW_MINUTES = 20
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.github.io"
@@ -212,12 +212,18 @@ def format_display_date(value):
 
 def build_windows(window_minutes, final_window_minutes):
     standard_tolerance = timedelta(minutes=window_minutes)
+    final_window = timedelta(minutes=final_window_minutes)
     return {
-        "2h": {"mode": "target", "delta": timedelta(hours=2), "tolerance": standard_tolerance},
+        "2h": {
+            "mode": "catchup",
+            "delta": timedelta(hours=2),
+            "tolerance": standard_tolerance,
+            "min_delta": final_window,
+        },
         "15m": {
             "mode": "range",
             "min_delta": timedelta(minutes=0),
-            "max_delta": timedelta(minutes=20),
+            "max_delta": final_window,
         },
     }
 
@@ -228,6 +234,12 @@ def is_due(time_until_start, trigger_config):
         min_delta = trigger_config.get("min_delta", timedelta())
         max_delta = trigger_config.get("max_delta", timedelta())
         return min_delta <= time_until_start <= max_delta
+
+    if mode == "catchup":
+        target_delta = trigger_config["delta"]
+        tolerance = trigger_config["tolerance"]
+        min_delta = trigger_config.get("min_delta", timedelta())
+        return min_delta < time_until_start <= target_delta + tolerance
 
     target_delta = trigger_config["delta"]
     tolerance = trigger_config["tolerance"]

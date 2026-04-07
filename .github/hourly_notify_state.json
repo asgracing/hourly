@@ -109,7 +109,10 @@
       "sent": {
         "2h": "2026-04-07T16:33:27+00:00"
       }
+    },
+    "hourly_2026-04-08_2000_monza": {
+      "sent": {}
     }
   },
-  "last_event_id": "hourly_2026-04-07_2000_monza"
+  "last_event_id": "hourly_2026-04-08_2000_monza"
 }

@@ -8,11 +8,11 @@ on:
         required: false
         default: "true"
       force_send:
-        description: "Send a test notification without waiting for 24h/4h/5m window"
+        description: "Send a test notification without waiting for the notification window"
         required: false
         default: "false"
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/20 * * * *"
 
 permissions:
   contents: write

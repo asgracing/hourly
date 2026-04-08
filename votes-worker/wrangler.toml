@@ -3,6 +3,6 @@ main = "src/index.js"
 compatibility_date = "2026-03-19"
 
 [vars]
-ALLOWED_ORIGIN = "https://asgracing.github.io"
+ALLOWED_ORIGIN = "https://asgracing.ru,https://www.asgracing.ru,https://asgracing.github.io"
 GITHUB_REPO_OWNER = "asgracing"
 GITHUB_REPO_NAME = "hourly-votes"

@@ -3,7 +3,6 @@ import json
 import math
 import os
 import re
-import shutil
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -25,7 +24,6 @@ ANNOUNCEMENT_PATH = DATA_ROOT_DIR / "announcement.json"
 RECENT_RACES_PATH = DATA_ROOT_DIR / "recent_races.json"
 RACES_DIR = DATA_ROOT_DIR / "races"
 RACES_INDEX_PATH = RACES_DIR / "races.json"
-HOURLY_RESULTS_EXPORT_DIR = Path(os.getenv("HOURLY_RESULTS_EXPORT_DIR", r"\\192.168.1.100\acchourly"))
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 SCHEDULE_LOOKAHEAD_SLOTS = 3
 RECENT_RACES_LIMIT = 12
@@ -862,50 +860,6 @@ def save_race_details(race_details_payload: dict):
             path.unlink(missing_ok=True)
 
 
-def copy_today_result_files(results_dir_path: Path):
-    if not results_dir_path.exists():
-        print(f"Hourly result export skipped: results dir not found: {results_dir_path}")
-        return
-
-    if not HOURLY_RESULTS_EXPORT_DIR.exists():
-        print(f"Hourly result export skipped: destination not found: {HOURLY_RESULTS_EXPORT_DIR}")
-        return
-
-    today = now_local().date()
-    copied = 0
-    skipped = 0
-
-    for source_path in sorted(results_dir_path.glob("*.json")):
-        try:
-            source_stat = source_path.stat()
-            source_date = datetime.fromtimestamp(source_stat.st_mtime, tz=UTC_PLUS_3).date()
-            if source_date < today:
-                skipped += 1
-                continue
-
-            destination_path = HOURLY_RESULTS_EXPORT_DIR / source_path.name
-            should_copy = True
-            if destination_path.exists():
-                destination_stat = destination_path.stat()
-                should_copy = (
-                    int(source_stat.st_mtime) != int(destination_stat.st_mtime)
-                    or int(source_stat.st_size) != int(destination_stat.st_size)
-                )
-
-            if should_copy:
-                shutil.copy2(source_path, destination_path)
-                copied += 1
-            else:
-                skipped += 1
-        except Exception as exc:
-            print(f"Hourly result export warning: failed to copy {source_path}: {exc}")
-
-    print(
-        "Hourly result export complete: "
-        f"destination={HOURLY_RESULTS_EXPORT_DIR}, copied={copied}, skipped={skipped}"
-    )
-
-
 def main():
     schedule_config = load_json(SCHEDULE_CONFIG_PATH, default={}) or {}
     rotation_state = load_json(ROTATION_STATE_PATH, default={}) or {}
@@ -919,7 +873,6 @@ def main():
     schedule_data = {"items": schedule_items, "updated_at": now_local_iso()}
     announcement = build_announcement(schedule_data, schedule_config, settings_data, event_config, event_rules)
     recent_races_summary, recent_races_details = build_recent_races(results_dir_path)
-    copy_today_result_files(results_dir_path)
     save_json(ROTATION_STATE_PATH, rotation_state)
     save_json(RUNTIME_STATE_PATH, runtime_state)
     save_json(SCHEDULE_PATH, schedule_data)

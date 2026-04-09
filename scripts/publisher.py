@@ -28,10 +28,10 @@ UTC_PLUS_3 = timezone(timedelta(hours=3))
 SCHEDULE_LOOKAHEAD_SLOTS = 3
 RECENT_RACES_LIMIT = 12
 INVALID_LAP_VALUES = {0, -1, 2147483647, 4294967295}
-POINTS_MAP = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+HOURLY_POINTS_MAP = {position: 26 - position for position in range(1, 26)}
 BEST_LAP_BONUS = 1
 HOURLY_POINTS_MULTIPLIER = 5
-SCORING_BASE_MAX_POINTS = POINTS_MAP[1]
+SCORING_BASE_MAX_POINTS = HOURLY_POINTS_MAP[1]
 CAR_MODEL_NAMES = {
     0: "Porsche 991 GT3 R", 1: "Mercedes-AMG GT3", 2: "Ferrari 488 GT3", 3: "Audi R8 LMS",
     4: "Lamborghini Huracan GT3", 5: "McLaren 650S GT3", 6: "Nissan GT-R Nismo GT3 2018",
@@ -93,7 +93,7 @@ def calculate_scaled_points(base_points, participant_count: int):
 
 
 def calculate_race_points(position: int, participant_count: int, has_best_lap: bool = False):
-    points = calculate_scaled_points(POINTS_MAP.get(position, 0), participant_count)
+    points = calculate_scaled_points(HOURLY_POINTS_MAP.get(position, 0), participant_count)
     if has_best_lap:
         points = normalize_points_value(points + BEST_LAP_BONUS)
     return points
@@ -697,10 +697,10 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
     race_best_lap_driver = None
     race_best_lap_public_id = None
     winner_total_time_ms = None
-    participant_count = sum(
+    scoring_participants_count = sum(
         1
         for ordered in race_order
-        if (line_by_id.get(id(ordered["line"])) or {}).get("player_id")
+        if (line_by_id.get(id(ordered["line"])) or {}).get("player_id") and is_counted_race_result(ordered["line"])
     )
     for position, ordered in enumerate(race_order, start=1):
         line = ordered["line"]
@@ -717,13 +717,9 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
         start_position = resolve_start_position(line, item["player_id"], qualifying_snapshot)
         positions_delta = start_position - position if isinstance(start_position, int) else None
         had_best_lap = best_lap_driver_id == item["player_id"]
-        points = (
-            apply_points_multiplier(
-                calculate_race_points(position, participant_count, had_best_lap),
-                HOURLY_POINTS_MULTIPLIER,
-            )
-            if counted_for_stats
-            else 0
+        points = apply_points_multiplier(
+            calculate_race_points(position, scoring_participants_count, had_best_lap),
+            HOURLY_POINTS_MULTIPLIER,
         )
         if position == 1:
             winner_name = item["display_name"]
@@ -758,6 +754,7 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
                 "gap_ms": gap_ms,
                 "gap": format_total_time(gap_ms) if gap_ms is not None else None,
                 "counted_for_stats": counted_for_stats,
+                "counted_for_points": True,
                 "points": points,
                 "had_best_lap": had_best_lap,
                 "penalty_count": penalty_data["count"],
@@ -783,9 +780,9 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
         "server_name": data.get("serverName"),
         "meta_data": data.get("metaData"),
         "participants_count": len(participants),
-        "scoring_participants_count": participant_count,
+        "scoring_participants_count": scoring_participants_count,
         "points_multiplier": HOURLY_POINTS_MULTIPLIER,
-        "points_rule": "scaled_by_participants_x5",
+        "points_rule": "scaled_25_to_1_by_classified_x5_all_participants",
         "winner": winner_name,
         "winner_public_id": winner_public_id,
         "best_lap": race_best_lap,

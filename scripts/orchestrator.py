@@ -16,7 +16,8 @@ import hourly_planning as planning
 
 
 APP_ROOT_DIR = Path(__file__).resolve().parents[1]
-DATA_ROOT_DIR = APP_ROOT_DIR.parent / "hourly-data"
+SERVER_ROOT_DIR = APP_ROOT_DIR.parent
+DATA_ROOT_DIR = SERVER_ROOT_DIR / "hourly-data"
 CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 ROTATION_STATE_PATH = CONFIG_DIR / "rotation_state.json"
@@ -74,27 +75,48 @@ def configure_logging():
     )
 
 
+def resolve_server_root(schedule_config: dict) -> Path:
+    configured_value = str(schedule_config.get("server_root") or "").strip()
+    if not configured_value:
+        return SERVER_ROOT_DIR
+
+    configured_path = Path(configured_value).expanduser()
+    if configured_path.is_absolute():
+        return configured_path
+
+    return SERVER_ROOT_DIR / configured_path
+
+
 def resolve_event_config_path(schedule_config: dict) -> Path:
-    server_root = Path(schedule_config["server_root"])
+    server_root = resolve_server_root(schedule_config)
     event_config_path = schedule_config.get("event_config_path")
 
     if event_config_path:
-        return server_root / Path(event_config_path)
+        configured_path = Path(event_config_path)
+        if configured_path.is_absolute():
+            return configured_path
+        return server_root / configured_path
 
     cfg_dir = schedule_config.get("cfg_dir", "cfg")
     return server_root / cfg_dir / "event.json"
 
 
 def resolve_server_exe_path(schedule_config: dict) -> Path:
-    server_root = Path(schedule_config["server_root"])
+    server_root = resolve_server_root(schedule_config)
     server_exe = schedule_config.get("server_exe") or "accServer.exe"
-    return server_root / server_exe
+    server_exe_path = Path(server_exe)
+    if server_exe_path.is_absolute():
+        return server_exe_path
+    return server_root / server_exe_path
 
 
 def resolve_results_dir_path(schedule_config: dict) -> Path:
-    server_root = Path(schedule_config["server_root"])
+    server_root = resolve_server_root(schedule_config)
     results_dir = schedule_config.get("results_dir") or "results"
-    return server_root / results_dir
+    results_dir_path = Path(results_dir)
+    if results_dir_path.is_absolute():
+        return results_dir_path
+    return server_root / results_dir_path
 
 
 def resolve_python_executable() -> str:

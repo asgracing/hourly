@@ -544,6 +544,76 @@ def build_race_order(lines: list):
     return prepared
 
 
+def dedupe_race_entries(race_order: list, normalized_lines: list):
+    line_by_id = {id(item["line"]): item for item in normalized_lines}
+    best_lap_by_player = {}
+
+    for item in normalized_lines:
+        player_id = item.get("player_id")
+        best_lap = item.get("best_lap")
+        if not player_id or best_lap is None:
+            continue
+
+        current_best = best_lap_by_player.get(player_id)
+        if current_best is None or best_lap < current_best:
+            best_lap_by_player[player_id] = best_lap
+
+    selected_by_player = {}
+    for ordered in race_order:
+        item = line_by_id.get(id(ordered["line"]))
+        if not item or not item.get("player_id"):
+            continue
+
+        player_id = item["player_id"]
+        current_counted = is_counted_race_result(ordered["line"])
+        existing = selected_by_player.get(player_id)
+        if existing is None or (current_counted and not existing["counted"]):
+            selected_by_player[player_id] = {
+                "ordered": ordered,
+                "counted": current_counted,
+            }
+
+    selected_line_ids = {
+        id(entry["ordered"]["line"])
+        for entry in selected_by_player.values()
+    }
+
+    deduped_normalized_lines = []
+    for item in normalized_lines:
+        line_id = id(item["line"])
+        if line_id not in selected_line_ids:
+            continue
+
+        deduped_item = dict(item)
+        player_id = deduped_item.get("player_id")
+        if player_id in best_lap_by_player:
+            deduped_item["best_lap"] = best_lap_by_player[player_id]
+        deduped_normalized_lines.append(deduped_item)
+
+    deduped_line_ids = {id(item["line"]) for item in deduped_normalized_lines}
+    deduped_race_order = []
+    emitted_line_ids = set()
+    for ordered in race_order:
+        line_id = id(ordered["line"])
+        if line_id not in deduped_line_ids or line_id in emitted_line_ids:
+            continue
+        deduped_race_order.append(ordered)
+        emitted_line_ids.add(line_id)
+
+    best_lap_driver_id = None
+    best_lap_ms = None
+    for item in deduped_normalized_lines:
+        player_id = item.get("player_id")
+        best_lap = item.get("best_lap")
+        if not player_id or best_lap is None:
+            continue
+        if best_lap_ms is None or best_lap < best_lap_ms:
+            best_lap_ms = best_lap
+            best_lap_driver_id = player_id
+
+    return deduped_race_order, deduped_normalized_lines, best_lap_driver_id
+
+
 def build_session_link_key(data: dict) -> str:
     return "|".join(
         [
@@ -683,9 +753,10 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
     lines = (((data or {}).get("sessionResult") or {}).get("leaderBoardLines") or [])
     if not isinstance(lines, list) or not lines:
         return None
-    normalized_lines, best_lap_driver_id = normalize_result_lines(lines)
-    line_by_id = {id(item["line"]): item for item in normalized_lines}
     race_order = build_race_order(lines)
+    normalized_lines, _ = normalize_result_lines(lines)
+    race_order, normalized_lines, best_lap_driver_id = dedupe_race_entries(race_order, normalized_lines)
+    line_by_id = {id(item["line"]): item for item in normalized_lines}
     penalty_lookup = build_penalty_lookup(data)
     track_code = str(data.get("trackName") or data.get("metaData") or "unknown").strip().lower()
     track_name = normalize_track_name(track_code)

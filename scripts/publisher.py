@@ -14,7 +14,8 @@ if str(SCRIPT_DIR) not in sys.path:
 import hourly_planning as planning
 
 APP_ROOT_DIR = Path(__file__).resolve().parents[1]
-DATA_ROOT_DIR = APP_ROOT_DIR.parent / "hourly-data"
+SERVER_ROOT_DIR = APP_ROOT_DIR.parent
+DATA_ROOT_DIR = SERVER_ROOT_DIR / "hourly-data"
 CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 ROTATION_STATE_PATH = CONFIG_DIR / "rotation_state.json"
@@ -137,8 +138,24 @@ def now_local_iso():
     return now_local().isoformat(timespec="seconds")
 
 
+def resolve_server_root_path(schedule_config: dict) -> Path:
+    configured_value = str(schedule_config.get("server_root") or "").strip()
+    if not configured_value:
+        return SERVER_ROOT_DIR
+
+    configured_path = Path(configured_value).expanduser()
+    if configured_path.is_absolute():
+        return configured_path
+
+    return SERVER_ROOT_DIR / configured_path
+
+
 def resolve_results_dir_path(schedule_config: dict) -> Path:
-    return Path(schedule_config["server_root"]) / (schedule_config.get("results_dir") or "results")
+    server_root = resolve_server_root_path(schedule_config)
+    results_dir = Path(schedule_config.get("results_dir") or "results")
+    if results_dir.is_absolute():
+        return results_dir
+    return server_root / results_dir
 
 
 def resolve_server_path(schedule_config: dict, configured_path: str | None, default_relative_path: str) -> Path:
@@ -146,9 +163,8 @@ def resolve_server_path(schedule_config: dict, configured_path: str | None, defa
         configured = Path(configured_path)
         if configured.is_absolute():
             return configured
-    server_root_value = schedule_config.get("server_root")
-    if server_root_value:
-        server_root = Path(server_root_value)
+    server_root = resolve_server_root_path(schedule_config)
+    if server_root:
         return server_root / Path(configured_path or default_relative_path)
     return DATA_ROOT_DIR / Path(configured_path or default_relative_path)
 

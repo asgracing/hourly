@@ -12,7 +12,8 @@ DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement
 DEFAULT_SCHEDULE_URL = "https://asgracing.github.io/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_WINDOW_MINUTES = 20
-DEFAULT_FINAL_WINDOW_MINUTES = 20
+DEFAULT_FINAL_WINDOW_BEFORE_MINUTES = 40
+DEFAULT_FINAL_WINDOW_AFTER_MINUTES = 10
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.github.io"
@@ -210,20 +211,21 @@ def format_display_date(value):
     return raw
 
 
-def build_windows(window_minutes, final_window_minutes):
+def build_windows(window_minutes, final_window_before_minutes, final_window_after_minutes):
     standard_tolerance = timedelta(minutes=window_minutes)
-    final_window = timedelta(minutes=final_window_minutes)
+    final_window_before = timedelta(minutes=final_window_before_minutes)
+    final_window_after = timedelta(minutes=final_window_after_minutes)
     return {
         "2h": {
             "mode": "catchup",
             "delta": timedelta(hours=2),
             "tolerance": standard_tolerance,
-            "min_delta": final_window,
+            "min_delta": final_window_before,
         },
         "15m": {
             "mode": "range",
-            "min_delta": timedelta(minutes=0),
-            "max_delta": final_window,
+            "min_delta": -final_window_after,
+            "max_delta": final_window_before,
         },
     }
 
@@ -276,7 +278,9 @@ def build_notification_title(item, trigger_key, time_until_start=None):
     lead = format_time_until_start(time_until_start) or get_trigger_label(trigger_key)
     track_name = item.get("track_name") or "Unknown track"
     if trigger_key == "15m":
-        return f"Last call for {track_name} in {lead}"
+        if time_until_start is not None and time_until_start.total_seconds() > 0:
+            return f"{track_name} starts in {lead}"
+        return f"{track_name} is about to start"
     if trigger_key == "test":
         return f"ASG Racing test alert for {track_name}"
     return f"{track_name} starts in {lead}"
@@ -290,9 +294,9 @@ def build_hype_line(trigger_key, time_until_start=None):
             return f"{prefix} {lead} to go. Time to finish prep, check the setup, and get ready for the race."
         return f"{prefix} Two hours to go. Time to finish prep, check the setup, and get ready for the race."
     if trigger_key == "15m":
-        if lead:
-            return f"{prefix} Server goes live in {lead}. Join now if you want to make the start."
-        return f"{prefix} Server is about to go live. Join now if you want to make the start."
+        if time_until_start is not None and time_until_start.total_seconds() > 0 and lead:
+            return f"{prefix} {lead} left. Join now if you want to make the start."
+        return f"{prefix} The race is about to start. Join now if you still want to make the grid."
     return f"{prefix} Quick delivery check for the hourly notifier."
 
 
@@ -498,7 +502,18 @@ def run():
     state_file = Path(read_env("HOURLY_NOTIFY_STATE_FILE", str(DEFAULT_STATE_FILE))).resolve()
     dry_run = os.getenv("HOURLY_NOTIFY_DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
     window_minutes = int(read_env("HOURLY_NOTIFY_WINDOW_MINUTES", str(DEFAULT_WINDOW_MINUTES)))
-    final_window_minutes = int(read_env("HOURLY_NOTIFY_FINAL_WINDOW_MINUTES", str(DEFAULT_FINAL_WINDOW_MINUTES)))
+    final_window_before_minutes = int(
+        read_env(
+            "HOURLY_NOTIFY_FINAL_WINDOW_BEFORE_MINUTES",
+            str(DEFAULT_FINAL_WINDOW_BEFORE_MINUTES),
+        )
+    )
+    final_window_after_minutes = int(
+        read_env(
+            "HOURLY_NOTIFY_FINAL_WINDOW_AFTER_MINUTES",
+            str(DEFAULT_FINAL_WINDOW_AFTER_MINUTES),
+        )
+    )
     force_send = os.getenv("HOURLY_NOTIFY_FORCE_SEND", "").strip().lower() in {"1", "true", "yes"}
 
     announcement = load_remote_json(announcement_url)
@@ -549,7 +564,7 @@ def run():
         save_state(state_file, state)
         return
 
-    triggers = build_windows(window_minutes, final_window_minutes)
+    triggers = build_windows(window_minutes, final_window_before_minutes, final_window_after_minutes)
     for trigger_key, trigger_config in triggers.items():
         if event_state["sent"].get(trigger_key):
             continue

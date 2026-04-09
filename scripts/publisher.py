@@ -696,6 +696,9 @@ def build_penalty_lookup(data: dict):
             car_id = item.get("carId")
             if car_id is None:
                 continue
+            penalty_type = item.get("penalty") or "Unknown"
+            if str(penalty_type).strip().lower() == "postracetime":
+                continue
             key = (car_id, item.get("driverIndex", 0))
             entry = penalty_lookup.setdefault(key, {"count": 0, "penalty_points": 0, "items": []})
             penalty_value = item.get("penaltyValue", 0)
@@ -704,7 +707,7 @@ def build_penalty_lookup(data: dict):
                 entry["penalty_points"] += penalty_value
             entry["items"].append(
                 {
-                    "type": item.get("penalty") or "Unknown",
+                    "type": penalty_type,
                     "reason": item.get("reason") or "Unknown",
                     "value": penalty_value if isinstance(penalty_value, (int, float)) else 0,
                     "bucket": bucket_name,

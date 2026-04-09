@@ -286,8 +286,16 @@ def build_notification_title(item, trigger_key, time_until_start=None):
     return f"{track_name} starts in {lead}"
 
 
-def build_hype_line(trigger_key, time_until_start=None):
-    prefix = "Take x5 points!"
+def build_hype_prefix(channel="plain"):
+    if channel == "telegram":
+        return "🔥🔥🔥 <b>TAKE X5 POINTS!</b> 🔥🔥🔥"
+    if channel == "discord":
+        return "🔥🔥🔥 **TAKE X5 POINTS!** 🔥🔥🔥"
+    return "🔥🔥🔥 TAKE X5 POINTS! 🔥🔥🔥"
+
+
+def build_hype_line(trigger_key, time_until_start=None, channel="plain"):
+    prefix = build_hype_prefix(channel)
     lead = format_time_until_start(time_until_start)
     if trigger_key == "2h":
         if lead:
@@ -310,7 +318,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
 
     lines = [
         build_notification_title(item, trigger_key, time_until_start),
-        build_hype_line(trigger_key, time_until_start),
+        build_hype_line(trigger_key, time_until_start, channel="plain"),
         f"Track: {track_name}",
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
@@ -333,7 +341,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     start_time_local = escape(str(item.get("start_time_local") or "--").strip())
     timezone_label = escape(str(item.get("timezone") or "UTC").strip())
     title = escape(build_notification_title(item, trigger_key, time_until_start))
-    hype_line = escape(build_hype_line(trigger_key, time_until_start))
+    hype_line = build_hype_line(trigger_key, time_until_start, channel="telegram")
     details_url = escape(build_details_url(item))
     registrations = item.get("registrations")
 
@@ -377,7 +385,7 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
 
     embed = {
         "title": build_notification_title(item, trigger_key, time_until_start),
-        "description": build_hype_line(trigger_key, time_until_start),
+        "description": build_hype_line(trigger_key, time_until_start, channel="discord"),
         "url": details_url,
         "color": 16748032,
         "fields": fields,

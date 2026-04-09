@@ -113,7 +113,7 @@ const translations = {
     racesCols: ["Date", "Track", "Winner", "Drivers", "Best Lap"],
     openRaceDetailsLabel: "Open race details",
     raceModalEyebrow: "Race details",
-    raceModalCols: ["Pos", "Start", "Delta", "Driver", "Best Lap", "Car", "Gap", "Pts", "Pen"],
+    raceModalCols: ["Pos", "Start", "Delta", "Driver", "Best Lap", "Car", "Gap", "Pts", "Pen pts"],
     raceSummaryTrack: "Track",
     raceSummaryWinner: "Winner",
     raceSummaryDrivers: "Drivers",
@@ -1075,7 +1075,7 @@ function renderRaceResultsModal() {
       <td><div>${escapeHtml(row.car_name || "-")}</div><div class="race-note">${row.counted_for_stats === false ? escapeHtml(t("notCountedBadge")) : ""}</div></td>
       <td>${escapeHtml(row.gap || (row.position === 1 ? "-" : "-"))}</td>
       <td>${escapeHtml(row.points ?? 0)}</td>
-      <td>${escapeHtml(row.penalty_count ?? 0)}</td>
+      <td>${escapeHtml(row.penalty_points ?? 0)}</td>
     </tr>
   `).join("");
   tableEl.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;

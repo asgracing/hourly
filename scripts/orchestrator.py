@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import os
@@ -22,12 +23,17 @@ CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 ROTATION_STATE_PATH = CONFIG_DIR / "rotation_state.json"
 RUNTIME_STATE_PATH = CONFIG_DIR / "runtime_state.json"
+STOP_REQUEST_PATH = CONFIG_DIR / "stop_request.json"
 REFERENCE_EVENT_PATH = APP_ROOT_DIR / "event.json"
 PUBLISHER_PATH = APP_ROOT_DIR / "scripts" / "publisher.py"
 LOGS_DIR = APP_ROOT_DIR / "logs"
 LOG_FILE_PATH = LOGS_DIR / "orchestrator.log"
 COMMIT_MESSAGE_PREFIX = "Hourly site update"
 UTC_PLUS_3 = timezone(timedelta(hours=3))
+STOP_POLL_SECONDS = 5
+RUN_MODE_VALUES = {"prompt", "test", "normal"}
+LAUNCH_MODE_VALUES = {"auto", "manual"}
+CONSUME_QUEUE_VALUES = {"auto", "yes", "no"}
 
 
 def detect_text_encoding(raw: bytes) -> str:
@@ -61,6 +67,101 @@ def save_json(path: Path, data, encoding: str = "utf-8"):
 
 def now_local_iso():
     return datetime.now(UTC_PLUS_3).isoformat(timespec="seconds")
+
+
+def clear_stop_request():
+    try:
+        STOP_REQUEST_PATH.unlink(missing_ok=True)
+    except OSError as exc:
+        logging.warning("Failed to clear stop request %s: %s", STOP_REQUEST_PATH, exc)
+
+
+def read_stop_request():
+    if not STOP_REQUEST_PATH.exists():
+        return None
+    try:
+        return load_json(STOP_REQUEST_PATH)
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+def wait_for_run_window(run_duration_seconds: int, process: subprocess.Popen) -> str:
+    deadline = time.monotonic() + max(0, run_duration_seconds)
+    while True:
+        if process.poll() is not None:
+            return "process_exited"
+        stop_request = read_stop_request()
+        if stop_request is not None:
+            logging.info("Stop request detected: %s", stop_request)
+            return "stop_requested"
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return "duration_elapsed"
+        time.sleep(min(STOP_POLL_SECONDS, remaining))
+
+
+def normalize_choice(value: str | None, allowed_values: set[str], default: str) -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in allowed_values else default
+
+
+def parse_args(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(description="Run or publish the hourly ACC scheduler.")
+    parser.add_argument(
+        "legacy_mode",
+        nargs="?",
+        choices=["publish-only"],
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--launch-mode",
+        choices=sorted(LAUNCH_MODE_VALUES),
+        default=normalize_choice(os.getenv("HOURLY_LAUNCH_MODE"), LAUNCH_MODE_VALUES, "auto"),
+        help="auto consumes the next scheduled slot; manual can run without moving the schedule queue.",
+    )
+    parser.add_argument(
+        "--run-mode",
+        choices=sorted(RUN_MODE_VALUES),
+        default=normalize_choice(os.getenv("HOURLY_RUN_MODE"), RUN_MODE_VALUES, "prompt"),
+        help="prompt keeps the old interactive question, test uses a short duration, normal uses server_window_minutes.",
+    )
+    parser.add_argument(
+        "--duration-seconds",
+        type=int,
+        default=None,
+        help="Override the run duration in seconds.",
+    )
+    parser.add_argument(
+        "--track-code",
+        default=os.getenv("HOURLY_TRACK_CODE"),
+        help="Track code for manual runs. Defaults to the next queued track.",
+    )
+    parser.add_argument(
+        "--weather-profile-id",
+        type=int,
+        default=None,
+        help="Weather profile id for manual runs. Defaults to a weighted random profile.",
+    )
+    parser.add_argument(
+        "--publish-only",
+        action="store_true",
+        help="Refresh hourly-data without launching the ACC server.",
+    )
+    parser.add_argument(
+        "--consume-queue",
+        choices=sorted(CONSUME_QUEUE_VALUES),
+        default=normalize_choice(os.getenv("HOURLY_CONSUME_QUEUE"), CONSUME_QUEUE_VALUES, "auto"),
+        help="auto consumes only scheduled auto runs. Use no for manual runs that should not move the schedule.",
+    )
+    parser.add_argument(
+        "--no-git-publish",
+        action="store_true",
+        help="Skip git add/commit/push after publisher.py.",
+    )
+    args = parser.parse_args(argv)
+    if args.legacy_mode == "publish-only":
+        args.publish_only = True
+    return args
 
 
 def configure_logging():
@@ -171,8 +272,20 @@ def prompt_with_timeout(prompt_text: str, timeout_seconds: int) -> str | None:
     return result["value"]
 
 
-def resolve_run_mode(schedule_config: dict) -> tuple[int, str]:
+def resolve_run_mode(schedule_config: dict, args=None) -> tuple[int, str]:
     default_duration = get_run_duration_seconds(schedule_config)
+    if args and isinstance(args.duration_seconds, int) and args.duration_seconds > 0:
+        return args.duration_seconds, f"{args.run_mode}_custom" if args.run_mode != "prompt" else "custom"
+
+    run_mode = getattr(args, "run_mode", "prompt") if args else "prompt"
+    if run_mode == "test":
+        test_run_seconds = schedule_config.get("test_run_seconds")
+        if not isinstance(test_run_seconds, int) or test_run_seconds <= 0:
+            test_run_seconds = 60
+        return test_run_seconds, "test"
+    if run_mode == "normal":
+        return default_duration, "normal"
+
     answer = prompt_with_timeout("Is this a test run? Type yes or no within 20 seconds: ", 20)
 
     if answer and answer.strip().lower() == "yes":
@@ -181,13 +294,20 @@ def resolve_run_mode(schedule_config: dict) -> tuple[int, str]:
     return default_duration, "normal"
 
 
-def resolve_publish_only_mode() -> bool:
-    cli_args = {arg.strip().lower() for arg in sys.argv[1:] if isinstance(arg, str)}
-    if "--publish-only" in cli_args or "publish-only" in cli_args:
+def resolve_publish_only_mode(args=None) -> bool:
+    if args and args.publish_only:
         return True
 
     env_value = os.getenv("HOURLY_PUBLISH_ONLY", "").strip().lower()
     return env_value in {"1", "true", "yes", "on"}
+
+
+def should_consume_queue(args, publish_only_mode: bool) -> bool:
+    if args.consume_queue == "yes":
+        return True
+    if args.consume_queue == "no":
+        return False
+    return args.launch_mode == "auto" and not publish_only_mode
 
 
 def get_track_key(schedule_config: dict) -> str:
@@ -216,6 +336,61 @@ def choose_next_track(schedule_config: dict, rotation_state: dict) -> tuple[dict
 
     normalized_index = next_index % len(tracks)
     return tracks[normalized_index], normalized_index
+
+
+def find_track_by_code(schedule_config: dict, track_code: str | None):
+    tracks = schedule_config.get("tracks") or []
+    if not tracks:
+        raise ValueError("No tracks configured in schedule_config.json")
+    if track_code:
+        for index, track in enumerate(tracks):
+            if track.get("code") == track_code:
+                return track, index
+        raise ValueError(f"Track code not found in schedule_config.json: {track_code}")
+    return None, None
+
+
+def build_manual_slot(selected_track: dict):
+    started_at = datetime.now(UTC_PLUS_3)
+    slot_date = started_at.strftime("%Y-%m-%d")
+    slot_time = started_at.strftime("%H:%M")
+    track_code = selected_track.get("code") or "unknown-track"
+    return {
+        "event_id": f"manual_{slot_date}_{started_at.strftime('%H%M%S')}_{track_code}",
+        "date": slot_date,
+        "start_time_local": slot_time,
+        "timezone": "UTC+3",
+        "track_code": track_code,
+        "track_name": selected_track.get("name") or planning.normalize_track_name(track_code),
+        "slot_label": "Manual Run",
+        "status": "manual",
+    }
+
+
+def generate_weather_for_profile_id(schedule_config: dict, profile_id: int):
+    weather_config = planning.get_weather_planning_config(schedule_config)
+    selected_profile = None
+    for profile in weather_config.get("profiles") or []:
+        if profile.get("id") == profile_id:
+            selected_profile = profile
+            break
+    if not selected_profile:
+        raise ValueError(f"Weather profile id not found: {profile_id}")
+
+    cloud_level = planning.random_float(selected_profile["cloud_range"])
+    rain_level = planning.random_float(selected_profile["rain_range"])
+    weather_randomness = planning.random_int(selected_profile["randomness_range"])
+    ambient_temp_c = int(round(planning.random_float(selected_profile["ambient_temp_range_c"])))
+    summary_key = selected_profile.get("summary_key") or planning.build_weather_summary_key(cloud_level, rain_level)
+    return {
+        "profile_id": selected_profile.get("id"),
+        "ambient_temp_c": ambient_temp_c,
+        "cloud_level": cloud_level,
+        "rain_level": rain_level,
+        "weather_randomness": weather_randomness,
+        "summary_key": summary_key,
+        "created_at": planning.now_local_iso(),
+    }
 
 
 def update_rotation_state(rotation_state: dict, selected_track: dict, selected_index: int, tracks: list[dict]):
@@ -392,39 +567,68 @@ def run_publisher():
         raise RuntimeError(f"publisher.py failed with exit code {publisher_result.returncode}")
 
 
-def main():
+def main(argv: list[str] | None = None):
     configure_logging()
+    args = parse_args(argv)
 
     try:
         logging.info("Hourly orchestrator started.")
         schedule_config = load_json(SCHEDULE_CONFIG_PATH)
         rotation_state = load_json(ROTATION_STATE_PATH)
         runtime_state = load_json(RUNTIME_STATE_PATH)
-        publish_only_mode = resolve_publish_only_mode()
-        run_duration_seconds, run_mode = resolve_run_mode(schedule_config)
+        publish_only_mode = resolve_publish_only_mode(args)
         if publish_only_mode:
-            run_mode = "publish_only"
+            run_duration_seconds, run_mode = 0, "publish_only"
+        else:
+            run_duration_seconds, run_mode = resolve_run_mode(schedule_config, args)
+        consume_queue = should_consume_queue(args, publish_only_mode)
 
-        _, selected_index = choose_next_track(schedule_config, rotation_state)
         schedule_items = planning.build_schedule_slots(schedule_config, rotation_state)
         runtime_state, schedule_items = planning.ensure_planned_weather(runtime_state, schedule_items, schedule_config)
-        if not schedule_items:
+
+        if args.launch_mode == "auto" and not schedule_items:
             raise RuntimeError("No upcoming hourly slots available for launch.")
-        selected_slot = schedule_items[0]
-        selected_track = {
-            "code": selected_slot.get("track_code"),
-            "name": selected_slot.get("track_name"),
-        }
-        planned_weather = selected_slot.get("weather") or planning.get_planned_weather_for_slot(runtime_state, selected_slot.get("event_id"))
+
+        if args.launch_mode == "manual":
+            selected_track, selected_index = find_track_by_code(schedule_config, args.track_code)
+            if not selected_track:
+                selected_track, selected_index = choose_next_track(schedule_config, rotation_state)
+            selected_slot = build_manual_slot(selected_track)
+            if args.weather_profile_id is not None:
+                planned_weather = generate_weather_for_profile_id(schedule_config, args.weather_profile_id)
+            else:
+                planned_weather = planning.generate_planned_weather(schedule_config)
+        else:
+            selected_slot = schedule_items[0]
+            selected_track, selected_index = find_track_by_code(schedule_config, selected_slot.get("track_code"))
+            planned_weather = (
+                selected_slot.get("weather")
+                or planning.get_planned_weather_for_slot(runtime_state, selected_slot.get("event_id"))
+            )
+
         event_config_path = resolve_event_config_path(schedule_config)
         server_exe_path = resolve_server_exe_path(schedule_config)
         results_dir_path = resolve_results_dir_path(schedule_config)
         track_key = get_track_key(schedule_config)
+
+        logging.info("Launch mode: %s", args.launch_mode)
+        logging.info("Consume queue: %s", consume_queue)
         logging.info("Selected track candidate: %s", selected_track["code"])
         logging.info("Resolved slot event id: %s", selected_slot.get("event_id"))
         logging.info("Resolved ACC event config path: %s", event_config_path)
         logging.info("Resolved server exe path: %s", server_exe_path)
         logging.info("Resolved results dir path: %s", results_dir_path)
+
+        if publish_only_mode:
+            logging.info("Publish-only mode enabled. Refreshing public schedule only.")
+            clear_stop_request()
+            run_publisher()
+            if args.no_git_publish:
+                logging.info("Git publish skipped by --no-git-publish.")
+            else:
+                publish_git_if_needed(selected_track)
+            logging.info("Hourly orchestrator completed successfully in publish-only mode.")
+            return
 
         if not event_config_path.exists():
             raise FileNotFoundError(f"ACC event config not found: {event_config_path}")
@@ -452,31 +656,19 @@ def main():
             )
 
         save_json(event_config_path, event_config, encoding=event_encoding)
-        save_json(
-            ROTATION_STATE_PATH,
-            update_rotation_state(rotation_state, selected_track, selected_index, schedule_config["tracks"])
-        )
-        runtime_state = update_runtime_state(runtime_state, event_config_path, selected_track, selected_slot, planned_weather)
-        save_json(RUNTIME_STATE_PATH, runtime_state)
-
-        if publish_only_mode:
-            logging.info("Publish-only mode enabled. Skipping server launch and refreshing public schedule only.")
+        if consume_queue:
             save_json(
                 ROTATION_STATE_PATH,
                 update_rotation_state(rotation_state, selected_track, selected_index, schedule_config["tracks"])
             )
-            runtime_state = update_runtime_state_publish_only(
-                runtime_state,
-                event_config_path,
-                selected_track,
-                selected_slot,
-                planned_weather,
-            )
-            save_json(RUNTIME_STATE_PATH, runtime_state)
-            run_publisher()
-            publish_git_if_needed(selected_track)
-            logging.info("Hourly orchestrator completed successfully in publish-only mode.")
-            return
+        else:
+            logging.info("Rotation state left unchanged for this run.")
+        runtime_state = update_runtime_state(runtime_state, event_config_path, selected_track, selected_slot, planned_weather)
+        runtime_state["launch_mode"] = args.launch_mode
+        runtime_state["run_mode"] = run_mode
+        runtime_state["consume_queue"] = consume_queue
+        save_json(RUNTIME_STATE_PATH, runtime_state)
+        clear_stop_request()
 
         process = subprocess.Popen(
             [str(server_exe_path)],
@@ -490,16 +682,29 @@ def main():
         logging.info("Run duration: %s seconds", run_duration_seconds)
         logging.info("Waiting for test/full run window to finish.")
 
-        time.sleep(run_duration_seconds)
-        logging.info("Stopping ACC server process with PID: %s", process.pid)
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/F"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        stop_reason = wait_for_run_window(run_duration_seconds, process)
+        logging.info("Run window ended: %s", stop_reason)
+        if process.poll() is None:
+            logging.info("Stopping ACC server process with PID: %s", process.pid)
+            stop_result = subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/F"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if stop_result.returncode != 0:
+                logging.warning(
+                    "taskkill failed with code %s: %s%s",
+                    stop_result.returncode,
+                    stop_result.stdout.strip(),
+                    stop_result.stderr.strip(),
+                )
+        else:
+            logging.info("ACC server process already exited with code: %s", process.returncode)
+        clear_stop_request()
 
         runtime_state = update_runtime_state_after_stop(runtime_state)
+        runtime_state["stop_reason"] = stop_reason
         save_json(RUNTIME_STATE_PATH, runtime_state)
 
         time.sleep(2)
@@ -533,7 +738,10 @@ def main():
                 "Publishing schedule and announcement updates anyway."
             )
 
-        publish_git_if_needed(selected_track)
+        if args.no_git_publish:
+            logging.info("Git publish skipped by --no-git-publish.")
+        else:
+            publish_git_if_needed(selected_track)
         logging.info("Hourly orchestrator completed successfully.")
     except Exception as exc:
         try:

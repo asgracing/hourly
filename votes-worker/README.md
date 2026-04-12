@@ -26,6 +26,9 @@ wrangler secret put GITHUB_TOKEN
 ```
 
 The token needs GitHub Issues read/write access for the target repository.
+If the GitHub PAT is regenerated, run the same command again from this
+`votes-worker/` directory and paste the new token. Wrangler updates the Worker
+secret without committing the token to git.
 
 ## Required vars
 

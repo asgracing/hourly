@@ -30,13 +30,10 @@ Example `weather_planning` block:
   "slots_ahead": 3,
   "ambient_temp_range_c": [14, 24],
   "profiles": [
-    { "id": 1, "weight": 14, "cloud_range": [0.25, 0.35], "rain_range": [0.2, 0.2], "randomness_range": [5, 7], "summary_key": "mixed" },
-    { "id": 2, "weight": 18, "cloud_range": [0.45, 0.6], "rain_range": [0.0, 0.0], "randomness_range": [5, 7], "summary_key": "mixed" },
-    { "id": 3, "weight": 16, "cloud_range": [0.6, 1.0], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "cloudy" },
-    { "id": 4, "weight": 24, "cloud_range": [0.0, 0.4], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "clear" },
-    { "id": 5, "weight": 14, "cloud_range": [0.6, 0.9], "rain_range": [0.0, 0.0], "randomness_range": [4, 7], "summary_key": "cloudy" },
-    { "id": 6, "weight": 9, "cloud_range": [0.6, 0.8], "rain_range": [0.1, 0.3], "randomness_range": [1, 3], "summary_key": "wet" },
-    { "id": 7, "weight": 5, "cloud_range": [0.6, 1.0], "rain_range": [0.45, 0.8], "randomness_range": [1, 3], "summary_key": "wet" }
+    { "id": 1, "weight": 25, "cloud_range": [0.0, 0.15], "rain_range": [0.0, 0.0], "randomness_range": [0, 2], "summary_key": "clear" },
+    { "id": 2, "weight": 25, "cloud_range": [0.65, 0.9], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "cloudy" },
+    { "id": 3, "weight": 25, "cloud_range": [0.35, 0.7], "rain_range": [0.0, 0.12], "randomness_range": [4, 7], "summary_key": "mixed" },
+    { "id": 4, "weight": 25, "cloud_range": [0.7, 0.95], "rain_range": [0.22, 0.35], "randomness_range": [2, 5], "summary_key": "wet" }
   ]
 }
 ```
@@ -103,3 +100,26 @@ Notes:
 - `workflow_dispatch` also supports `force_send=true` for an immediate test message without waiting for the notification window
 - by default the final reminder window is `40 minutes before` to `10 minutes after` the scheduled start
 - scheduled workflows on GitHub only run from the default branch, so this branch can be tested manually but must be merged into the default branch before cron notifications will start
+
+## Local control GUI
+
+Run the lightweight local control panel on the server with:
+
+```powershell
+python scripts\hourly_gui.py
+```
+
+The GUI reads and edits `../hourly-data/config/*.json`, shows schedule/runtime/logs,
+and starts `scripts/orchestrator.py` with explicit options. Auto schedule runs
+consume the next queued slot by default. Manual runs default to leaving the
+schedule queue unchanged, so extra ad-hoc races do not steal tomorrow's slot.
+Use `Graceful stop + publish` for early session stops: it writes
+`../hourly-data/config/stop_request.json`, then the running orchestrator stops
+ACC, checks Q/R result files, rebuilds hourly data, and publishes normally.
+`Emergency kill PID` is only a fallback when the orchestrator is not responding.
+
+The same controls are also available from CLI, for example:
+
+```powershell
+python scripts\orchestrator.py --launch-mode manual --run-mode test --track-code monza --weather-profile-id 1 --consume-queue no
+```

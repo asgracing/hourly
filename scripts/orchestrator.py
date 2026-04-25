@@ -28,9 +28,11 @@ REFERENCE_EVENT_PATH = APP_ROOT_DIR / "event.json"
 PUBLISHER_PATH = APP_ROOT_DIR / "scripts" / "publisher.py"
 LOGS_DIR = APP_ROOT_DIR / "logs"
 LOG_FILE_PATH = LOGS_DIR / "orchestrator.log"
+SERVER_OUTPUT_LOG_PATH = LOGS_DIR / "acc_server_stdout.log"
 COMMIT_MESSAGE_PREFIX = "Hourly site update"
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 STOP_POLL_SECONDS = 5
+PROCESS_STOP_TIMEOUT_SECONDS = 30
 RUN_MODE_VALUES = {"prompt", "test", "normal"}
 LAUNCH_MODE_VALUES = {"auto", "manual"}
 CONSUME_QUEUE_VALUES = {"auto", "yes", "no"}
@@ -222,6 +224,52 @@ def resolve_results_dir_path(schedule_config: dict) -> Path:
 
 def resolve_python_executable() -> str:
     return sys.executable or "python"
+
+
+def resolve_creationflags() -> int:
+    return subprocess.CREATE_NO_WINDOW if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+
+
+def start_acc_server_process(server_exe_path: Path) -> tuple[subprocess.Popen, Path]:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    with SERVER_OUTPUT_LOG_PATH.open("a", encoding="utf-8", newline="") as output_file:
+        output_file.write(f"\n===== {now_local_iso()} ACC server launch =====\n")
+        output_file.flush()
+        process = subprocess.Popen(
+            [str(server_exe_path)],
+            cwd=str(server_exe_path.parent),
+            stdin=subprocess.DEVNULL,
+            stdout=output_file,
+            stderr=subprocess.STDOUT,
+            creationflags=resolve_creationflags(),
+        )
+    return process, SERVER_OUTPUT_LOG_PATH
+
+
+def stop_acc_server_process(process: subprocess.Popen):
+    logging.info("Stopping ACC server process with PID: %s", process.pid)
+    stop_result = subprocess.run(
+        ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if stop_result.stdout.strip():
+        logging.info("taskkill stdout:\n%s", stop_result.stdout.strip())
+    if stop_result.stderr.strip():
+        logging.warning("taskkill stderr:\n%s", stop_result.stderr.strip())
+    if stop_result.returncode != 0:
+        logging.warning("taskkill failed with code %s", stop_result.returncode)
+        return
+    try:
+        process.wait(timeout=PROCESS_STOP_TIMEOUT_SECONDS)
+        logging.info("ACC server process exited with code: %s", process.returncode)
+    except subprocess.TimeoutExpired:
+        logging.warning(
+            "ACC server process PID %s did not exit within %s seconds after taskkill.",
+            process.pid,
+            PROCESS_STOP_TIMEOUT_SECONDS,
+        )
 
 
 def run_git(args: list[str]):
@@ -670,11 +718,9 @@ def main(argv: list[str] | None = None):
         save_json(RUNTIME_STATE_PATH, runtime_state)
         clear_stop_request()
 
-        process = subprocess.Popen(
-            [str(server_exe_path)],
-            cwd=str(server_exe_path.parent),
-        )
+        process, server_output_log_path = start_acc_server_process(server_exe_path)
         logging.info("Started ACC server process with PID: %s", process.pid)
+        logging.info("ACC server stdout/stderr redirected to: %s", server_output_log_path)
 
         runtime_state = update_runtime_state_with_process(runtime_state, process)
         save_json(RUNTIME_STATE_PATH, runtime_state)
@@ -685,20 +731,7 @@ def main(argv: list[str] | None = None):
         stop_reason = wait_for_run_window(run_duration_seconds, process)
         logging.info("Run window ended: %s", stop_reason)
         if process.poll() is None:
-            logging.info("Stopping ACC server process with PID: %s", process.pid)
-            stop_result = subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/F"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if stop_result.returncode != 0:
-                logging.warning(
-                    "taskkill failed with code %s: %s%s",
-                    stop_result.returncode,
-                    stop_result.stdout.strip(),
-                    stop_result.stderr.strip(),
-                )
+            stop_acc_server_process(process)
         else:
             logging.info("ACC server process already exited with code: %s", process.returncode)
         clear_stop_request()

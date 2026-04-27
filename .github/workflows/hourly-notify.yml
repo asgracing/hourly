@@ -12,7 +12,7 @@ on:
         required: false
         default: "false"
   schedule:
-    - cron: "*/15 10-13,16-19 * * *"
+    - cron: "*/5 10-18 * * *"
       timezone: "Europe/Moscow"
 
 permissions:
@@ -41,10 +41,6 @@ jobs:
           HOURLY_ANNOUNCEMENT_URL: ${{ vars.HOURLY_ANNOUNCEMENT_URL }}
           HOURLY_SCHEDULE_URL: ${{ vars.HOURLY_SCHEDULE_URL }}
           HOURLY_VOTES_API_BASE: ${{ vars.HOURLY_VOTES_API_BASE }}
-          HOURLY_NOTIFY_3H_WINDOW_START_MINUTES: ${{ vars.HOURLY_NOTIFY_3H_WINDOW_START_MINUTES }}
-          HOURLY_NOTIFY_3H_WINDOW_END_MINUTES: ${{ vars.HOURLY_NOTIFY_3H_WINDOW_END_MINUTES }}
-          HOURLY_NOTIFY_1H_WINDOW_START_MINUTES: ${{ vars.HOURLY_NOTIFY_1H_WINDOW_START_MINUTES }}
-          HOURLY_NOTIFY_1H_WINDOW_END_MINUTES: ${{ vars.HOURLY_NOTIFY_1H_WINDOW_END_MINUTES }}
           HOURLY_NOTIFY_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
           HOURLY_NOTIFY_FORCE_SEND: ${{ github.event.inputs.force_send == 'true' && 'true' || 'false' }}
         run: python scripts/hourly_notify.py

@@ -11,16 +11,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement.json"
 DEFAULT_SCHEDULE_URL = "https://asgracing.github.io/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
-DEFAULT_THREE_HOUR_WINDOW_START_MINUTES = 195
-DEFAULT_THREE_HOUR_WINDOW_END_MINUTES = 125
-DEFAULT_ONE_HOUR_WINDOW_START_MINUTES = 75
-DEFAULT_ONE_HOUR_WINDOW_END_MINUTES = 5
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.ru"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
 SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
+MSK_TIMEZONE = timezone(timedelta(hours=3))
+DEFAULT_NOON_TRIGGER_HOUR_MSK = 12
+DEFAULT_AFTERNOON_TRIGGER_HOUR_MSK = 16
+DEFAULT_TRIGGER_WINDOW_HOURS = 2
 
 
 def normalize_event_id(value):
@@ -52,6 +52,20 @@ def read_int_env(name, default_value):
         return int(read_env(name, str(default_value)))
     except ValueError:
         return default_value
+
+
+def get_now(target_tz=None):
+    tzinfo = target_tz or timezone.utc
+    raw = os.getenv("HOURLY_NOTIFY_NOW", "").strip()
+    if raw:
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=tzinfo)
+            return parsed.astimezone(tzinfo)
+        except ValueError:
+            print(f"invalid HOURLY_NOTIFY_NOW value: {raw}; fallback to current clock")
+    return datetime.now(tzinfo)
 
 
 def load_remote_json(url):
@@ -135,7 +149,7 @@ def parse_timezone_offset(value):
     if not raw or raw in {"UTC", "GMT"}:
         return timezone.utc
     if raw in {"MSK", "UTC+3", "UTC+03:00"}:
-        return timezone(timedelta(hours=3))
+        return MSK_TIMEZONE
     if raw == "UTC-3":
         return timezone(-timedelta(hours=3))
 
@@ -185,7 +199,7 @@ def load_schedule_items(schedule_url):
 
 def pick_notification_item(announcement, schedule_items):
     announcement_start = parse_event_start(announcement)
-    now = datetime.now(announcement_start.tzinfo or timezone.utc)
+    now = get_now(announcement_start.tzinfo or timezone.utc)
     if announcement_start > now:
         return announcement, announcement_start
 
@@ -219,34 +233,33 @@ def format_display_date(value):
     return raw
 
 
-def build_range_window(start_minutes_before, end_minutes_before):
-    min_minutes = min(start_minutes_before, end_minutes_before)
-    max_minutes = max(start_minutes_before, end_minutes_before)
+def build_clock_window(target_hour_msk, tolerance_hours):
+    target_minutes = target_hour_msk * 60
+    tolerance_minutes = max(0, tolerance_hours) * 60
     return {
-        "mode": "range",
-        "min_delta": timedelta(minutes=min_minutes),
-        "max_delta": timedelta(minutes=max_minutes),
+        "mode": "clock_window",
+        "start_minutes": target_minutes - tolerance_minutes,
+        "end_minutes": target_minutes + tolerance_minutes,
     }
 
 
-def build_windows(
-    three_hour_window_start_minutes,
-    three_hour_window_end_minutes,
-    one_hour_window_start_minutes,
-    one_hour_window_end_minutes,
-):
+def build_windows():
     return {
-        "3h": build_range_window(three_hour_window_start_minutes, three_hour_window_end_minutes),
-        "1h": build_range_window(one_hour_window_start_minutes, one_hour_window_end_minutes),
+        "12_msk": build_clock_window(DEFAULT_NOON_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
+        "16_msk": build_clock_window(DEFAULT_AFTERNOON_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
     }
 
 
-def is_due(time_until_start, trigger_config):
-    mode = trigger_config.get("mode", "target")
-    if mode == "range":
-        min_delta = trigger_config.get("min_delta", timedelta())
-        max_delta = trigger_config.get("max_delta", timedelta())
-        return min_delta <= time_until_start <= max_delta
+def is_due(now, time_until_start, trigger_config):
+    mode = trigger_config.get("mode", "clock_window")
+    if mode == "clock_window":
+        now_msk = now.astimezone(MSK_TIMEZONE)
+        current_minutes = now_msk.hour * 60 + now_msk.minute
+        start_minutes = int(trigger_config.get("start_minutes", 0))
+        end_minutes = int(trigger_config.get("end_minutes", 0))
+        if start_minutes <= end_minutes:
+            return start_minutes <= current_minutes <= end_minutes
+        return current_minutes >= start_minutes or current_minutes <= end_minutes
 
     if mode == "catchup":
         target_delta = trigger_config["delta"]
@@ -260,10 +273,10 @@ def is_due(time_until_start, trigger_config):
 
 
 def get_trigger_label(trigger_key):
-    if trigger_key == "3h":
-        return "3 hours"
-    if trigger_key == "1h":
-        return "1 hour"
+    if trigger_key == "12_msk":
+        return "12:00 MSK"
+    if trigger_key == "16_msk":
+        return "16:00 MSK"
     return "test"
 
 
@@ -286,10 +299,12 @@ def format_time_until_start(time_until_start):
 
 
 def build_notification_title(item, trigger_key, time_until_start=None):
-    lead = format_time_until_start(time_until_start) or get_trigger_label(trigger_key)
+    lead = format_time_until_start(time_until_start)
     track_name = item.get("track_name") or "Unknown track"
     if trigger_key == "test":
         return f"ASG Racing test alert for {track_name}"
+    if not lead:
+        return f"ASG Racing reminder for {track_name}"
     return f"{track_name} starts in {lead}"
 
 
@@ -304,14 +319,14 @@ def build_hype_prefix(channel="plain"):
 def build_hype_line(trigger_key, time_until_start=None, channel="plain"):
     prefix = build_hype_prefix(channel)
     lead = format_time_until_start(time_until_start)
-    if trigger_key == "3h":
+    if trigger_key == "12_msk":
         if lead:
-            return f"{prefix} {lead} to go. Time to finish prep, check the setup, and get ready for the race."
-        return f"{prefix} Three hours to go. Time to finish prep, check the setup, and get ready for the race."
-    if trigger_key == "1h":
+            return f"{prefix} {lead} to go. Midday reminder for the next hourly race."
+        return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
+    if trigger_key == "16_msk":
         if lead:
-            return f"{prefix} {lead} left. Join soon if you want to make the start."
-        return f"{prefix} One hour to go. Join soon if you want to make the start."
+            return f"{prefix} {lead} to go. Afternoon reminder for the next hourly race."
+        return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
     return f"{prefix} Quick delivery check for the hourly notifier."
 
 
@@ -512,8 +527,8 @@ def cleanup_state(state, active_event_id):
 
 def trigger_already_sent(event_state, trigger_key):
     legacy_keys = {
-        "3h": ("3h", "2h"),
-        "1h": ("1h", "15m"),
+        "12_msk": ("12_msk", "3h", "2h"),
+        "16_msk": ("16_msk", "1h", "15m"),
     }
     sent = event_state.get("sent") or {}
     return any(sent.get(key) for key in legacy_keys.get(trigger_key, (trigger_key,)))
@@ -525,22 +540,6 @@ def run():
     votes_api_base = read_env("HOURLY_VOTES_API_BASE", DEFAULT_VOTES_API_BASE)
     state_file = Path(read_env("HOURLY_NOTIFY_STATE_FILE", str(DEFAULT_STATE_FILE))).resolve()
     dry_run = os.getenv("HOURLY_NOTIFY_DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
-    three_hour_window_start_minutes = read_int_env(
-        "HOURLY_NOTIFY_3H_WINDOW_START_MINUTES",
-        DEFAULT_THREE_HOUR_WINDOW_START_MINUTES,
-    )
-    three_hour_window_end_minutes = read_int_env(
-        "HOURLY_NOTIFY_3H_WINDOW_END_MINUTES",
-        DEFAULT_THREE_HOUR_WINDOW_END_MINUTES,
-    )
-    one_hour_window_start_minutes = read_int_env(
-        "HOURLY_NOTIFY_1H_WINDOW_START_MINUTES",
-        DEFAULT_ONE_HOUR_WINDOW_START_MINUTES,
-    )
-    one_hour_window_end_minutes = read_int_env(
-        "HOURLY_NOTIFY_1H_WINDOW_END_MINUTES",
-        DEFAULT_ONE_HOUR_WINDOW_END_MINUTES,
-    )
     force_send = os.getenv("HOURLY_NOTIFY_FORCE_SEND", "").strip().lower() in {"1", "true", "yes"}
 
     announcement = load_remote_json(announcement_url)
@@ -571,7 +570,7 @@ def run():
     if votes_summary and "votes" in votes_summary:
         announcement["registrations"] = votes_summary.get("votes")
 
-    now = datetime.now(event_start.tzinfo or timezone.utc)
+    now = get_now(event_start.tzinfo or timezone.utc)
     time_until_start = event_start - now
 
     state = load_state(state_file)
@@ -591,16 +590,13 @@ def run():
         save_state(state_file, state)
         return
 
-    triggers = build_windows(
-        three_hour_window_start_minutes,
-        three_hour_window_end_minutes,
-        one_hour_window_start_minutes,
-        one_hour_window_end_minutes,
-    )
+    triggers = build_windows()
     for trigger_key, trigger_config in triggers.items():
         if trigger_already_sent(event_state, trigger_key):
             continue
-        if not is_due(time_until_start, trigger_config):
+        if time_until_start <= timedelta():
+            continue
+        if not is_due(now, time_until_start, trigger_config):
             continue
 
         message = build_plain_message(announcement, trigger_key, time_until_start)
@@ -610,7 +606,7 @@ def run():
         else:
             dispatch(announcement, trigger_key, time_until_start)
 
-        event_state["sent"][trigger_key] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        event_state["sent"][trigger_key] = get_now(timezone.utc).isoformat(timespec="seconds")
         sent_now.append(trigger_key)
 
     state["last_event_id"] = event_id
@@ -620,7 +616,8 @@ def run():
     if sent_now:
         print(f"sent: {event_id} -> {', '.join(sent_now)}")
     else:
-        print(f"no notifications due for {event_id}; time until start: {time_until_start}")
+        now_msk = now.astimezone(MSK_TIMEZONE).isoformat(timespec="minutes")
+        print(f"no notifications due for {event_id}; msk now: {now_msk}; time until start: {time_until_start}")
 
 
 if __name__ == "__main__":

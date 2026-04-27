@@ -39,6 +39,22 @@ def normalize_event_id(value):
     return "".join(chars).strip("_")
 
 
+def canonicalize_event_id(value, date_value=None, time_value=None):
+    normalized = normalize_event_id(value)
+    parts = normalized.split("_") if normalized else []
+    if len(parts) >= 3 and parts[0] == "hourly":
+        date_part = parts[1]
+        time_part = parts[2]
+        if len(date_part) == 10 and len(time_part) == 4:
+            return f"hourly_{date_part}_{time_part}"
+
+    safe_date = str(date_value or "").strip()
+    safe_time = str(time_value or "").strip().replace(":", "")
+    if safe_date and safe_time:
+        return normalize_event_id(f"hourly_{safe_date}_{safe_time}")
+    return normalized
+
+
 def read_env(name, default_value):
     value = os.getenv(name)
     if value is None:
@@ -76,6 +92,7 @@ def load_remote_json(url):
 def load_votes_summary(votes_api_base, event_id):
     if not votes_api_base or not event_id:
         return {}
+    canonical_event_id = canonicalize_event_id(event_id)
     url = f"{votes_api_base.rstrip('/')}/votes?event_ids={parse.quote(event_id)}&voter_id=notify-bot"
     req = request.Request(
         url,
@@ -93,7 +110,7 @@ def load_votes_summary(votes_api_base, event_id):
     items = payload.get("items")
     if not isinstance(items, dict):
         return {}
-    summary = items.get(event_id)
+    summary = items.get(canonical_event_id) or items.get(event_id)
     return summary if isinstance(summary, dict) else {}
 
 
@@ -114,14 +131,17 @@ def save_state(state_file, state):
 
 
 def build_event_id(item):
-    explicit_id = normalize_event_id(item.get("event_id"))
+    explicit_id = canonicalize_event_id(
+        item.get("event_id"),
+        item.get("date"),
+        item.get("start_time_local"),
+    )
     if explicit_id:
         return explicit_id
 
     date_str = str(item.get("date") or "").strip()
     time_str = str(item.get("start_time_local") or "").strip().replace(":", "")
-    track_code = normalize_event_id(item.get("track_code") or item.get("track_name") or "slot")
-    return normalize_event_id(f"hourly_{date_str}_{time_str}_{track_code}")
+    return canonicalize_event_id("", date_str, time_str)
 
 
 def build_details_url(item):

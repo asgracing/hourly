@@ -408,6 +408,7 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
     return {
         "title": schedule_config.get("title", "Часовая гонка"),
         "status": next_item.get("status", "scheduled"),
+        "event_id": next_item.get("event_id"),
         "date": next_item.get("date"),
         "start_time_local": next_item.get("start_time_local"),
         "timezone": next_item.get("timezone") or schedule_config.get("timezone", "UTC+3"),

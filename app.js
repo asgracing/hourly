@@ -679,13 +679,19 @@ function normalizeEventId(value) {
     .replace(/[^a-z0-9._-]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
+function canonicalizeSlotEventId(value) {
+  const normalized = normalizeEventId(value);
+  const match = normalized.match(/^hourly_(\d{4}-\d{2}-\d{2})_(\d{4})(?:_.+)?$/);
+  if (!match) return normalized;
+  return `hourly_${match[1]}_${match[2]}`;
+}
 function buildSlotEventId(item) {
-  const explicitId = normalizeEventId(item?.event_id);
+  const explicitId = canonicalizeSlotEventId(item?.event_id);
   if (explicitId) return explicitId;
   const date = String(item?.date || "").trim();
   const time = String(item?.start_time_local || "").trim().replace(":", "");
-  const trackCode = normalizeEventId(item?.track_code || item?.track_name || "slot");
-  return normalizeEventId(`hourly_${date}_${time}_${trackCode}`);
+  if (!date || !time) return "";
+  return normalizeEventId(`hourly_${date}_${time}`);
 }
 function getBrowserVoterId() {
   const storageKey = "hourlyVoteVoterId";

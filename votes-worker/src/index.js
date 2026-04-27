@@ -45,16 +45,75 @@ function normalizeEventId(value) {
     .replace(/^_+|_+$/g, "");
 }
 
+function normalizeSlotTime(value) {
+  const raw = String(value || "").trim();
+  if (/^\d{2}:\d{2}$/.test(raw)) return raw;
+  if (/^\d{4}$/.test(raw)) return `${raw.slice(0, 2)}:${raw.slice(2, 4)}`;
+  return raw;
+}
+
+function parseSlotFromEventId(value) {
+  const normalized = normalizeEventId(value);
+  const match = normalized.match(/^hourly_(\d{4}-\d{2}-\d{2})_(\d{4})(?:_.+)?$/);
+  if (!match) return null;
+  return {
+    event_id: `hourly_${match[1]}_${match[2]}`,
+    date: match[1],
+    time: normalizeSlotTime(match[2])
+  };
+}
+
+function canonicalizeEventId(value) {
+  const normalized = normalizeEventId(value);
+  const slot = parseSlotFromEventId(normalized);
+  return slot?.event_id || normalized;
+}
+
+function buildSlotMetadata(slot) {
+  const eventId = canonicalizeEventId(slot?.event_id);
+  const parsedSlot = parseSlotFromEventId(eventId);
+  return {
+    event_id: eventId,
+    track: String(slot?.track || "-").trim() || "-",
+    date: String(slot?.date || parsedSlot?.date || "").trim(),
+    time: normalizeSlotTime(slot?.time || parsedSlot?.time || "")
+  };
+}
+
+function parseIssueMetadata(issueBody) {
+  const metadata = {};
+  String(issueBody || "")
+    .split(/\r?\n/)
+    .forEach(line => {
+      const separatorIndex = line.indexOf(":");
+      if (separatorIndex <= 0) return;
+      const key = line.slice(0, separatorIndex).trim().toLowerCase();
+      const value = line.slice(separatorIndex + 1).trim();
+      metadata[key] = value;
+    });
+  const slotFromEventId = parseSlotFromEventId(metadata.event_id);
+  return {
+    event_id: canonicalizeEventId(metadata.event_id),
+    date: String(metadata.date || slotFromEventId?.date || "").trim(),
+    time: normalizeSlotTime(metadata.time || slotFromEventId?.time || "")
+  };
+}
+
+function slotMetadataMatches(left, right) {
+  return Boolean(left?.date && left?.time && right?.date && right?.time && left.date === right.date && left.time === right.time);
+}
+
 function issueTitle(eventId) {
-  return `Vote: ${normalizeEventId(eventId)}`;
+  return `Vote: ${canonicalizeEventId(eventId)}`;
 }
 
 function buildIssueBody(slot) {
+  const metadata = buildSlotMetadata(slot);
   return [
-    `event_id: ${normalizeEventId(slot.event_id)}`,
-    `track: ${slot.track || "-"}`,
-    `date: ${slot.date || "-"}`,
-    `time: ${slot.time || "-"}`,
+    `event_id: ${metadata.event_id}`,
+    `track: ${metadata.track}`,
+    `date: ${metadata.date || "-"}`,
+    `time: ${metadata.time || "-"}`,
     "",
     "This issue stores vote comments for an hourly race slot."
   ].join("\n");
@@ -84,32 +143,86 @@ async function githubFetch(env, path, init = {}) {
   return response;
 }
 
-async function findIssue(env, eventId) {
-  const owner = env.GITHUB_REPO_OWNER;
-  const repo = env.GITHUB_REPO_NAME;
-  const query = encodeURIComponent(`repo:${owner}/${repo} is:issue in:title "${issueTitle(eventId)}"`);
-  const response = await githubFetch(env, `/search/issues?q=${query}`);
+async function searchIssues(env, query) {
+  const response = await githubFetch(env, `/search/issues?q=${encodeURIComponent(query)}`);
   const data = await response.json();
-  return Array.isArray(data.items) && data.items.length ? data.items[0] : null;
+  return Array.isArray(data.items) ? data.items : [];
 }
 
-async function ensureIssue(env, slot) {
-  const existing = await findIssue(env, slot.event_id);
-  if (existing) return existing;
+function dedupeIssues(issues) {
+  const seen = new Map();
+  for (const issue of issues || []) {
+    if (!issue?.number) continue;
+    seen.set(issue.number, issue);
+  }
+  return [...seen.values()];
+}
+
+function chooseCanonicalIssue(issues, eventId) {
+  const targetTitle = issueTitle(eventId);
+  return [...(issues || [])].sort((left, right) => {
+    const leftExact = left?.title === targetTitle ? 1 : 0;
+    const rightExact = right?.title === targetTitle ? 1 : 0;
+    if (leftExact !== rightExact) return rightExact - leftExact;
+
+    const leftComments = Number(left?.comments || 0);
+    const rightComments = Number(right?.comments || 0);
+    if (leftComments !== rightComments) return rightComments - leftComments;
+
+    return Date.parse(left?.created_at || 0) - Date.parse(right?.created_at || 0);
+  })[0] || null;
+}
+
+async function findIssues(env, eventId, slotHint = null) {
+  const canonicalEventId = canonicalizeEventId(eventId);
+  const titleMatches = await searchIssues(
+    env,
+    `repo:${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME} is:issue label:hourly-vote in:title "${issueTitle(canonicalEventId)}"`
+  );
+  const slotMetadata = buildSlotMetadata({ event_id: canonicalEventId, date: slotHint?.date, time: slotHint?.time });
+  if (!slotMetadata.date || !slotMetadata.time) {
+    return dedupeIssues(titleMatches);
+  }
+  const slotMatches = await searchIssues(
+    env,
+    `repo:${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME} is:issue label:hourly-vote "date: ${slotMetadata.date}" "time: ${slotMetadata.time}"`
+  );
+  return dedupeIssues(
+    [...titleMatches, ...slotMatches].filter(issue => {
+      if (issue?.title === issueTitle(canonicalEventId)) return true;
+      return slotMetadataMatches(parseIssueMetadata(issue?.body), slotMetadata);
+    })
+  );
+}
+
+async function findIssue(env, eventId, slotHint = null) {
+  return chooseCanonicalIssue(await findIssues(env, eventId, slotHint), eventId);
+}
+
+async function createIssue(env, slot) {
+  const metadata = buildSlotMetadata(slot);
+  const owner = env.GITHUB_REPO_OWNER;
+  const repo = env.GITHUB_REPO_NAME;
   const response = await githubFetch(
     env,
-    `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues`,
+    `/repos/${owner}/${repo}/issues`,
     {
       method: "POST",
       headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify({
-        title: issueTitle(slot.event_id),
+        title: issueTitle(metadata.event_id),
         labels: ["hourly-vote", "slot-vote"],
-        body: buildIssueBody(slot)
+        body: buildIssueBody(metadata)
       })
     }
   );
   return response.json();
+}
+
+async function ensureIssue(env, slot, issues = []) {
+  const existing = chooseCanonicalIssue(issues, slot.event_id);
+  if (existing) return existing;
+  return createIssue(env, slot);
 }
 
 async function listVoteComments(env, issueNumber) {
@@ -125,6 +238,19 @@ function findVoteCommentByVoterId(comments, voterId) {
   return comments.find(comment => parseVoteComment(comment?.body) === voterId) || null;
 }
 
+function findVoteCommentsByVoterId(comments, voterId) {
+  return comments.filter(comment => parseVoteComment(comment?.body) === voterId);
+}
+
+async function listVoteCommentsForIssues(env, issues) {
+  const commentGroups = await Promise.all(
+    (issues || [])
+      .filter(issue => issue?.number)
+      .map(issue => listVoteComments(env, issue.number))
+  );
+  return commentGroups.flat();
+}
+
 function summarizeVotes(eventId, comments, voterId = "") {
   const uniqueVoters = new Set();
   comments.forEach(comment => {
@@ -132,7 +258,7 @@ function summarizeVotes(eventId, comments, voterId = "") {
     if (parsed) uniqueVoters.add(parsed);
   });
   return {
-    event_id: normalizeEventId(eventId),
+    event_id: canonicalizeEventId(eventId),
     votes: uniqueVoters.size,
     already_voted: voterId ? uniqueVoters.has(voterId) : false
   };
@@ -140,22 +266,22 @@ function summarizeVotes(eventId, comments, voterId = "") {
 
 async function handleGetVotes(request, env, origin) {
   const url = new URL(request.url);
-  const eventIds = String(url.searchParams.get("event_ids") || "")
+  const eventIds = [...new Set(String(url.searchParams.get("event_ids") || "")
     .split(",")
-    .map(normalizeEventId)
-    .filter(Boolean);
+    .map(canonicalizeEventId)
+    .filter(Boolean))];
   const voterId = String(url.searchParams.get("voter_id") || "").trim();
   if (!eventIds.length) {
     return jsonResponse({ ok: false, error: "event_ids query parameter is required" }, 400, origin);
   }
   const results = {};
   for (const eventId of eventIds) {
-    const issue = await findIssue(env, eventId);
-    if (!issue?.number) {
+    const issues = await findIssues(env, eventId);
+    if (!issues.length) {
       results[eventId] = { event_id: eventId, votes: 0, already_voted: false };
       continue;
     }
-    const comments = await listVoteComments(env, issue.number);
+    const comments = await listVoteCommentsForIssues(env, issues);
     results[eventId] = summarizeVotes(eventId, comments, voterId);
   }
   return jsonResponse({ ok: true, items: results }, 200, origin);
@@ -163,20 +289,22 @@ async function handleGetVotes(request, env, origin) {
 
 async function handlePostVote(request, env, origin) {
   const payload = await request.json().catch(() => null);
-  const eventId = normalizeEventId(payload?.event_id);
+  const eventId = canonicalizeEventId(payload?.event_id);
   const voterId = String(payload?.voter_id || "").trim();
   if (!eventId || !voterId) {
     return jsonResponse({ ok: false, error: "event_id and voter_id are required" }, 400, origin);
   }
-  const issue = await ensureIssue(env, {
+  const slot = buildSlotMetadata({
     event_id: eventId,
     track: payload?.track,
     date: payload?.date,
     time: payload?.time
   });
-  const comments = await listVoteComments(env, issue.number);
+  const issues = await findIssues(env, eventId, slot);
+  const comments = await listVoteCommentsForIssues(env, issues);
   const summary = summarizeVotes(eventId, comments, voterId);
   if (!summary.already_voted) {
+    const issue = await ensureIssue(env, slot, issues);
     await githubFetch(
       env,
       `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issue.number}/comments`,
@@ -186,7 +314,7 @@ async function handlePostVote(request, env, origin) {
         body: JSON.stringify({ body: `vote:${voterId}` })
       }
     );
-    const updatedComments = await listVoteComments(env, issue.number);
+    const updatedComments = await listVoteCommentsForIssues(env, dedupeIssues([...issues, issue]));
     return jsonResponse({ ok: true, ...summarizeVotes(eventId, updatedComments, voterId) }, 200, origin);
   }
   return jsonResponse({ ok: true, ...summary }, 200, origin);
@@ -194,25 +322,28 @@ async function handlePostVote(request, env, origin) {
 
 async function handlePostUnvote(request, env, origin) {
   const payload = await request.json().catch(() => null);
-  const eventId = normalizeEventId(payload?.event_id);
+  const eventId = canonicalizeEventId(payload?.event_id);
   const voterId = String(payload?.voter_id || "").trim();
   if (!eventId || !voterId) {
     return jsonResponse({ ok: false, error: "event_id and voter_id are required" }, 400, origin);
   }
-  const issue = await findIssue(env, eventId);
-  if (!issue?.number) {
+  const issues = await findIssues(env, eventId);
+  if (!issues.length) {
     return jsonResponse({ ok: true, event_id: eventId, votes: 0, already_voted: false }, 200, origin);
   }
-  const comments = await listVoteComments(env, issue.number);
-  const voteComment = findVoteCommentByVoterId(comments, voterId);
-  if (voteComment?.id) {
-    await githubFetch(
-      env,
-      `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/comments/${voteComment.id}`,
-      { method: "DELETE" }
-    );
+  for (const issue of issues) {
+    const comments = await listVoteComments(env, issue.number);
+    const voteComments = findVoteCommentsByVoterId(comments, voterId);
+    for (const voteComment of voteComments) {
+      if (!voteComment?.id) continue;
+      await githubFetch(
+        env,
+        `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/comments/${voteComment.id}`,
+        { method: "DELETE" }
+      );
+    }
   }
-  const updatedComments = await listVoteComments(env, issue.number);
+  const updatedComments = await listVoteCommentsForIssues(env, issues);
   return jsonResponse({ ok: true, ...summarizeVotes(eventId, updatedComments, voterId) }, 200, origin);
 }
 

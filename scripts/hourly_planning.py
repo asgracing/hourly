@@ -1,4 +1,5 @@
 import random
+import re
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
@@ -50,11 +51,20 @@ def now_local_iso():
     return now_local().isoformat(timespec="seconds")
 
 
-def build_event_id(date_value, time_value, track_code):
+def canonicalize_event_id(value, date_value=None, time_value=None):
+    raw = str(value or "").strip().lower()
+    match = re.fullmatch(r"hourly_(\d{4}-\d{2}-\d{2})_(\d{4})(?:_.+)?", raw)
+    if match:
+        return f"hourly_{match.group(1)}_{match.group(2)}"
+    if date_value and time_value:
+        return build_event_id(date_value, time_value)
+    return raw or None
+
+
+def build_event_id(date_value, time_value, track_code=None):
     safe_date = date_value or "unknown-date"
     safe_time = (time_value or "0000").replace(":", "")
-    safe_track = track_code or "unknown-track"
-    return f"hourly_{safe_date}_{safe_time}_{safe_track}"
+    return f"hourly_{safe_date}_{safe_time}"
 
 
 def parse_slot_datetime(item: dict):
@@ -372,26 +382,39 @@ def ensure_planned_weather(runtime_state: dict, schedule_items: list[dict], sche
     if not isinstance(planned_weather, dict):
         planned_weather = {}
 
-    active_event_id = runtime_state.get("active_event_id")
-    valid_event_ids = {
-        item.get("event_id")
-        for item in schedule_items
-        if isinstance(item, dict) and item.get("event_id")
-    }
-    if isinstance(active_event_id, str) and active_event_id:
+    active_event_id = canonicalize_event_id(runtime_state.get("active_event_id"))
+    valid_event_ids = set()
+    for item in schedule_items:
+        if not isinstance(item, dict):
+            continue
+        canonical_event_id = canonicalize_event_id(
+            item.get("event_id"),
+            item.get("date"),
+            item.get("start_time_local"),
+        )
+        if canonical_event_id:
+            valid_event_ids.add(canonical_event_id)
+
+    if active_event_id:
         valid_event_ids.add(active_event_id)
 
     cleaned_planned_weather = {}
     for event_id, weather in planned_weather.items():
-        if event_id in valid_event_ids and isinstance(weather, dict):
-            cleaned_planned_weather[event_id] = weather
+        canonical_event_id = canonicalize_event_id(event_id)
+        if canonical_event_id in valid_event_ids and isinstance(weather, dict) and canonical_event_id not in cleaned_planned_weather:
+            cleaned_planned_weather[canonical_event_id] = weather
 
     planned_weather = cleaned_planned_weather
 
     for item in schedule_items:
-        event_id = item.get("event_id")
+        event_id = canonicalize_event_id(
+            item.get("event_id"),
+            item.get("date"),
+            item.get("start_time_local"),
+        )
         if not event_id:
             continue
+        item["event_id"] = event_id
         weather = planned_weather.get(event_id)
         if not isinstance(weather, dict):
             weather = generate_planned_weather(schedule_config)
@@ -411,11 +434,13 @@ def ensure_planned_weather(runtime_state: dict, schedule_items: list[dict], sche
         item["rain_level"] = item_weather.get("rain_level")
 
     runtime_state["planned_weather"] = planned_weather
+    if active_event_id:
+        runtime_state["active_event_id"] = active_event_id
     runtime_state["updated_at"] = now_local_iso()
     return runtime_state, schedule_items
 
 
 def get_planned_weather_for_slot(runtime_state: dict, event_id: str):
     planned_weather = (runtime_state or {}).get("planned_weather") or {}
-    weather = planned_weather.get(event_id)
+    weather = planned_weather.get(canonicalize_event_id(event_id))
     return weather if isinstance(weather, dict) else None

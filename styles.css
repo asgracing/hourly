@@ -357,14 +357,14 @@ body {
 }
 
 .hero {
-  padding: 10px 0 8px;
+  padding: 6px 0 6px;
 }
 
 .hero-card {
   --hero-track-photo: none;
   position: relative;
   overflow: hidden;
-  padding: 8px;
+  padding: 6px;
   border: 1px solid var(--line);
   border-radius: 30px;
   background:
@@ -392,7 +392,7 @@ body {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
-  gap: 8px;
+  gap: 6px;
   align-items: stretch;
 }
 
@@ -432,9 +432,9 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
   min-height: 100%;
-  padding: 8px;
+  padding: 6px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.03);
@@ -444,33 +444,33 @@ h2 {
 .hero-server-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 16px;
+  gap: 10px 12px;
 }
 
 .hero-server-grid-rules {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .hero-server-stack {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .hero-server-item {
   min-width: 0;
-  padding: 14px 15px;
+  padding: 11px 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   background: rgba(9, 14, 21, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .hero-server-item .value {
-  line-height: 1.45;
+  line-height: 1.35;
   overflow-wrap: anywhere;
   font-size: 0.98rem;
   font-weight: 600;
@@ -481,7 +481,7 @@ h2 {
 .hero-token-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-end;
   margin-left: auto;
 }
@@ -490,8 +490,8 @@ h2 {
   display: inline-flex;
   align-items: center;
   position: relative;
-  min-height: 30px;
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 5px 9px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.06);
@@ -637,7 +637,7 @@ h2 {
 }
 
 .hero-server-item-emphasis .label {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   text-align: left;
 }
 
@@ -655,7 +655,7 @@ h2 {
   align-items: flex-start;
   justify-content: flex-start;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .hero-server-grid-rules .hero-server-item .label {
@@ -678,7 +678,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   margin-left: 0;
 }
 
@@ -743,8 +743,8 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 18px;
-  padding: 18px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid rgba(255, 209, 102, 0.26);
   border-radius: 20px;
   background:
@@ -759,24 +759,24 @@ h2 {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
 }
 
 .hero-announcement-eyebrow {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   color: #ffcc5c;
 }
 
 .hero-announcement-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .hero-announcement-inline-meta {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 .hero-announcement-inline-stat {
@@ -788,7 +788,7 @@ h2 {
 .hero-announcement-inline-stat-combined {
   align-items: stretch;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .hero-announcement-inline-stat .value {
@@ -811,12 +811,12 @@ h2 {
 .hero-announcement-inline-stat-combined .hero-token-list {
   justify-content: center;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .hero-announcement-inline-stat-combined .hero-token {
-  min-height: 28px;
-  padding: 5px 8px;
+  min-height: 26px;
+  padding: 4px 7px;
   font-size: 0.74rem;
 }
 
@@ -832,7 +832,7 @@ h2 {
 }
 
 .hero-announcement-weather {
-  padding: 14px 15px;
+  padding: 11px 12px;
   border: 1px solid rgba(255, 209, 102, 0.14);
   border-radius: 16px;
   background:
@@ -856,7 +856,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .hero-announcement-weather .label,
@@ -903,8 +903,8 @@ h2 {
   justify-content: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 4px;
-  padding: 12px 14px;
+  margin-top: 2px;
+  padding: 9px 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   background: rgba(8, 12, 18, 0.5);
@@ -914,7 +914,7 @@ h2 {
 .schedule-event-vote-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -924,8 +924,8 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 38px;
+  padding: 8px 12px;
   border: 1px solid rgba(255, 209, 102, 0.24);
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(255, 107, 44, 0.88), rgba(255, 145, 77, 0.88));
@@ -978,8 +978,8 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   border: 1px solid rgba(255, 107, 107, 0.34);
   border-radius: 999px;
@@ -1879,23 +1879,23 @@ body.modal-open {
 
 @media (max-width: 840px) and (min-width: 721px) {
   .hero {
-    padding-top: 18px;
+    padding-top: 12px;
   }
 
   .hero-card {
-    padding: 8px;
+    padding: 6px;
     border-radius: 22px;
   }
 
   .hero-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 12px;
   }
 
   .hero-announcement-card {
     order: -1;
-    padding: 9px;
-    gap: 9px;
+    padding: 7px;
+    gap: 7px;
   }
 
   .hero-server-grid {
@@ -1923,14 +1923,14 @@ body.modal-open {
   }
 
   .hero-server-card {
-    gap: 10px;
-    padding: 8px;
+    gap: 8px;
+    padding: 6px;
   }
 
   .hero-server-item,
   .hero-announcement-meta .stat,
   .hero-announcement-weather {
-    padding: 7px 8px;
+    padding: 6px 7px;
   }
 
   .hero-server-item .label,
@@ -2167,23 +2167,23 @@ body.modal-open {
   }
 
   .hero {
-    padding-top: 18px;
+    padding-top: 12px;
   }
 
   .hero-card {
-    padding: 8px;
+    padding: 6px;
     border-radius: 22px;
   }
 
   .hero-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 12px;
   }
 
   .hero-announcement-card {
     order: -1;
-    padding: 9px;
-    gap: 9px;
+    padding: 7px;
+    gap: 7px;
   }
 
   .hero-server-grid {
@@ -2227,7 +2227,7 @@ body.modal-open {
 
   .hero-announcement-meta .stat,
   .hero-announcement-weather {
-    padding: 7px 8px;
+    padding: 6px 7px;
   }
 
   .hero-server-item .label,

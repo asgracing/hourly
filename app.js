@@ -4,6 +4,71 @@ const recentRacesUrl = "https://asgracing.github.io/hourly-data/races/races.json
 const recentRaceDetailsBaseUrl = "https://asgracing.github.io/hourly-data/";
 const votesApiBase =
   document.querySelector('meta[name="hourly-votes-api"]')?.getAttribute("content")?.trim() || "";
+const VOTER_ID_STORAGE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
+function getLegalUrls() {
+  const fallbackBase =
+    document.querySelector('meta[name="legal-base-path"]')?.getAttribute("content")?.trim() || "./";
+  return window.ASGLegal?.getUrls?.() || {
+    privacy: `${fallbackBase}privacy/`,
+    cookies: `${fallbackBase}cookies/`
+  };
+}
+
+function buildVoteLegalNoteHtml() {
+  const { privacy, cookies } = getLegalUrls();
+  if (currentLang === "ru") {
+    return `Нажимая кнопку, вы соглашаетесь на обработку технического идентификатора браузера для учёта одного голоса на слот. Подробнее: <a href="${escapeHtml(privacy)}">политика ПДн</a> и <a href="${escapeHtml(cookies)}">cookies</a>.`;
+  }
+  return `By clicking this button, you agree to processing of a technical browser identifier to count one vote per slot. Details: <a href="${escapeHtml(privacy)}">privacy policy</a> and <a href="${escapeHtml(cookies)}">cookies notice</a>.`;
+}
+
+function buildCompactVoteLegalNoteHtml() {
+  const { privacy } = getLegalUrls();
+  if (currentLang === "ru") {
+    return `Голосуя, вы соглашаетесь с обработкой тех. идентификатора браузера. <a href="${escapeHtml(privacy)}">Подробнее</a>.`;
+  }
+  return `Voting means you agree to processing of a technical browser identifier. <a href="${escapeHtml(privacy)}">Details</a>.`;
+}
+
+function getExpiringStorageValue(storageKey, ttlMs) {
+  const rawValue = localStorage.getItem(storageKey);
+  const now = Date.now();
+
+  if (rawValue) {
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (parsed && typeof parsed.value === "string") {
+        if (!parsed.expiresAt || Number(parsed.expiresAt) > now) {
+          return parsed.value;
+        }
+      }
+    } catch (error) {
+      if (rawValue.trim()) {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            value: rawValue.trim(),
+            createdAt: now,
+            expiresAt: now + ttlMs
+          })
+        );
+        return rawValue.trim();
+      }
+    }
+  }
+
+  const generated = `browser-${now.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify({
+      value: generated,
+      createdAt: now,
+      expiresAt: now + ttlMs
+    })
+  );
+  return generated;
+}
 
 const translations = {
   en: {
@@ -596,6 +661,7 @@ function buildScheduleModalDetails(item) {
     <div class="schedule-modal-hero">
       <div class="schedule-modal-vote">
         ${buildVoteControls(item, "hero")}
+        <div class="legal-inline-note">${buildCompactVoteLegalNoteHtml()}</div>
       </div>
 
       <section class="hero-server-card schedule-modal-hero-pane">
@@ -695,12 +761,7 @@ function buildSlotEventId(item) {
 }
 function getBrowserVoterId() {
   const storageKey = "hourlyVoteVoterId";
-  let value = localStorage.getItem(storageKey);
-  if (!value) {
-    value = `browser-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    localStorage.setItem(storageKey, value);
-  }
-  return value;
+  return getExpiringStorageValue(storageKey, VOTER_ID_STORAGE_TTL_MS);
 }
 function getVoteLabel(count) {
   if (typeof count !== "number" || count <= 0) return t("voteCountZero");
@@ -881,7 +942,10 @@ function renderHeroVote() {
     container.innerHTML = "";
     return;
   }
-  container.innerHTML = buildVoteControls(firstSlot, "hero");
+  container.innerHTML = `
+    ${buildVoteControls(firstSlot, "hero")}
+    <div class="legal-inline-note">${buildCompactVoteLegalNoteHtml()}</div>
+  `;
   bindVoteControls(container);
 }
 function applyHeroTrackBackground(trackCode) {

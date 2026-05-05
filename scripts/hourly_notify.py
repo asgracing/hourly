@@ -17,6 +17,7 @@ SITE_BASE_URL = "https://asgracing.ru"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
 SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
+RACE_PAGE_BUTTON_LABEL = "ХОЧУ ПОЕХАТЬ!"
 WEATHER_SUMMARY_LABELS = {
     "clear": "Clear",
     "mixed": "Mixed clouds",
@@ -159,6 +160,38 @@ def build_details_url(item):
     if details_url.startswith("/"):
         return f"{SITE_BASE_URL}{details_url}"
     return f"{HOURLY_PAGE_URL}{details_url.lstrip('./')}"
+
+
+def build_telegram_button_markup(details_url):
+    return json.dumps(
+        {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": RACE_PAGE_BUTTON_LABEL,
+                        "url": details_url,
+                    }
+                ]
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+
+def build_discord_link_button(details_url):
+    return [
+        {
+            "type": 1,
+            "components": [
+                {
+                    "type": 2,
+                    "style": 5,
+                    "label": RACE_PAGE_BUTTON_LABEL,
+                    "url": details_url,
+                }
+            ],
+        }
+    ]
 
 
 def build_track_image_url(item, channel="default"):
@@ -407,7 +440,6 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     timezone_label = str(item.get("timezone") or "UTC").strip()
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
-    details_url = build_details_url(item)
     weather_summary = build_weather_summary(item)
 
     lines = [
@@ -426,8 +458,6 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     description = str(item.get("description") or "").strip()
     if description:
         lines.append(description)
-
-    lines.append(f"Race page: {details_url}")
     return "\n".join(lines)
 
 
@@ -438,7 +468,6 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     timezone_label = escape(str(item.get("timezone") or "UTC").strip())
     title = escape(build_notification_title(item, trigger_key, time_until_start))
     hype_line = build_hype_line(trigger_key, time_until_start, channel="telegram")
-    details_url = escape(build_details_url(item))
     registrations = item.get("registrations")
 
     lines = [
@@ -453,12 +482,6 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     if registrations not in (None, ""):
         lines.append(f"👥 <b>Registered drivers:</b> {escape(str(registrations))}")
 
-    lines.extend(
-        [
-            "",
-            f"👉 <a href=\"{details_url}\">Open race page</a>",
-        ]
-    )
     return "\n".join(lines)
 
 
@@ -498,10 +521,11 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
             "parse": ["everyone"]
         },
         "embeds": [embed],
+        "components": build_discord_link_button(details_url),
     }
 
 
-def send_telegram_message(message):
+def send_telegram_message(message, details_url):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     if not bot_token or not chat_id:
@@ -512,6 +536,7 @@ def send_telegram_message(message):
             "chat_id": chat_id,
             "text": message,
             "disable_web_page_preview": "false",
+            "reply_markup": build_telegram_button_markup(details_url),
         }
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -521,7 +546,7 @@ def send_telegram_message(message):
     return True
 
 
-def send_telegram_photo(caption, image_url):
+def send_telegram_photo(caption, image_url, details_url):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     if not bot_token or not chat_id or not image_url:
@@ -533,6 +558,7 @@ def send_telegram_photo(caption, image_url):
             "photo": image_url,
             "caption": caption,
             "parse_mode": "HTML",
+            "reply_markup": build_telegram_button_markup(details_url),
         }
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
@@ -548,8 +574,20 @@ def send_discord_message(payload):
         return False
 
     body = json.dumps(payload).encode("utf-8")
+    parsed_url = parse.urlsplit(webhook_url)
+    query_items = dict(parse.parse_qsl(parsed_url.query, keep_blank_values=True))
+    query_items["with_components"] = "true"
+    request_url = parse.urlunsplit(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            parse.urlencode(query_items),
+            parsed_url.fragment,
+        )
+    )
     req = request.Request(
-        webhook_url,
+        request_url,
         data=body,
         headers={
             "Content-Type": "application/json",
@@ -565,6 +603,7 @@ def send_discord_message(payload):
 def dispatch(item, trigger_key, time_until_start=None):
     telegram_sent = False
     discord_sent = False
+    details_url = build_details_url(item)
 
     track_image_url = build_track_image_url(item, channel="telegram")
     if track_image_url:
@@ -576,6 +615,7 @@ def dispatch(item, trigger_key, time_until_start=None):
             telegram_sent = send_telegram_photo(
                 caption,
                 track_image_url,
+                details_url,
             )
         except error.HTTPError as exc:
             print(f"telegram photo failed: {exc.code} {exc.reason}; fallback to text")
@@ -583,7 +623,10 @@ def dispatch(item, trigger_key, time_until_start=None):
             print(f"telegram photo failed: {exc}; fallback to text")
 
     if not telegram_sent:
-        telegram_sent = send_telegram_message(build_plain_message(item, trigger_key, time_until_start))
+        telegram_sent = send_telegram_message(
+            build_plain_message(item, trigger_key, time_until_start),
+            details_url,
+        )
 
     try:
         discord_sent = send_discord_message(build_discord_payload(item, trigger_key, time_until_start))

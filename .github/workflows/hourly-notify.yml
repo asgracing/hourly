@@ -12,7 +12,7 @@ on:
         required: false
         default: "false"
   schedule:
-    - cron: "*/5 10-18 * * *"
+    - cron: "*/5 10-20 * * *"
       timezone: "Europe/Moscow"
 
 permissions:

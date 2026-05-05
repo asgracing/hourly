@@ -17,9 +17,15 @@ SITE_BASE_URL = "https://asgracing.ru"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
 SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
+WEATHER_SUMMARY_LABELS = {
+    "clear": "Clear",
+    "mixed": "Mixed clouds",
+    "cloudy": "Cloudy",
+    "wet": "Wet risk",
+}
 MSK_TIMEZONE = timezone(timedelta(hours=3))
 DEFAULT_NOON_TRIGGER_HOUR_MSK = 12
-DEFAULT_AFTERNOON_TRIGGER_HOUR_MSK = 16
+DEFAULT_EVENING_TRIGGER_HOUR_MSK = 18
 DEFAULT_TRIGGER_WINDOW_HOURS = 2
 
 
@@ -253,6 +259,51 @@ def format_display_date(value):
     return raw
 
 
+def format_weather_percent(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return round(value * 100)
+
+
+def format_weather_temperature(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    rounded = round(float(value), 1)
+    if rounded.is_integer():
+        return f"{int(rounded)}C"
+    return f"{rounded:.1f}C"
+
+
+def build_weather_summary(item):
+    weather = item.get("weather") if isinstance(item.get("weather"), dict) else {}
+    summary_key = str(weather.get("summary_key") or item.get("summary_key") or "").strip().lower()
+    parts = []
+
+    summary_label = WEATHER_SUMMARY_LABELS.get(summary_key)
+    if summary_label:
+        parts.append(summary_label)
+
+    temperature_label = format_weather_temperature(weather.get("ambient_temp_c"))
+    if temperature_label:
+        parts.append(temperature_label)
+
+    cloud_percent = format_weather_percent(weather.get("cloud_level"))
+    if cloud_percent is not None:
+        parts.append(f"clouds {cloud_percent}%")
+
+    rain_percent = format_weather_percent(weather.get("rain_level"))
+    if rain_percent is None:
+        rain_percent = format_weather_percent(item.get("rain_level"))
+    if rain_percent is not None:
+        parts.append(f"rain {rain_percent}%")
+
+    randomness = weather.get("weather_randomness")
+    if not isinstance(randomness, bool) and isinstance(randomness, (int, float)):
+        parts.append(f"randomness {round(randomness)}")
+
+    return " | ".join(parts) if parts else ""
+
+
 def build_clock_window(target_hour_msk, tolerance_hours):
     target_minutes = target_hour_msk * 60
     tolerance_minutes = max(0, tolerance_hours) * 60
@@ -266,7 +317,7 @@ def build_clock_window(target_hour_msk, tolerance_hours):
 def build_windows():
     return {
         "12_msk": build_clock_window(DEFAULT_NOON_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
-        "16_msk": build_clock_window(DEFAULT_AFTERNOON_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
+        "18_msk": build_clock_window(DEFAULT_EVENING_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
     }
 
 
@@ -295,8 +346,8 @@ def is_due(now, time_until_start, trigger_config):
 def get_trigger_label(trigger_key):
     if trigger_key == "12_msk":
         return "12:00 MSK"
-    if trigger_key == "16_msk":
-        return "16:00 MSK"
+    if trigger_key == "18_msk":
+        return "18:00 MSK"
     return "test"
 
 
@@ -343,9 +394,9 @@ def build_hype_line(trigger_key, time_until_start=None, channel="plain"):
         if lead:
             return f"{prefix} {lead} to go. Midday reminder for the next hourly race."
         return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
-    if trigger_key == "16_msk":
+    if trigger_key == "18_msk":
         if lead:
-            return f"{prefix} {lead} to go. Afternoon reminder for the next hourly race."
+            return f"{prefix} {lead} to go. Evening reminder for the next hourly race."
         return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
     return f"{prefix} Quick delivery check for the hourly notifier."
 
@@ -357,6 +408,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
     details_url = build_details_url(item)
+    weather_summary = build_weather_summary(item)
 
     lines = [
         build_notification_title(item, trigger_key, time_until_start),
@@ -365,6 +417,8 @@ def build_plain_message(item, trigger_key, time_until_start=None):
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
     ]
+    if weather_summary:
+        lines.append(f"Weather: {weather_summary}")
 
     if registrations not in (None, ""):
         lines.append(f"Registered drivers: {registrations}")
@@ -416,12 +470,15 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     details_url = build_details_url(item)
     registrations = item.get("registrations")
     image_url = build_track_image_url(item)
+    weather_summary = build_weather_summary(item)
 
     fields = [
         {"name": "Track", "value": track_name, "inline": True},
         {"name": "Date", "value": date_str, "inline": True},
         {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
     ]
+    if weather_summary:
+        fields.append({"name": "Weather", "value": weather_summary, "inline": False})
     if registrations not in (None, ""):
         fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
 
@@ -512,8 +569,12 @@ def dispatch(item, trigger_key, time_until_start=None):
     track_image_url = build_track_image_url(item, channel="telegram")
     if track_image_url:
         try:
+            caption = build_photo_caption(item, trigger_key, time_until_start)
+            weather_summary = build_weather_summary(item)
+            if weather_summary and "<b>Weather:</b>" not in caption:
+                caption = f"{caption}\n<b>Weather:</b> {escape(weather_summary)}"
             telegram_sent = send_telegram_photo(
-                build_photo_caption(item, trigger_key, time_until_start),
+                caption,
                 track_image_url,
             )
         except error.HTTPError as exc:
@@ -548,7 +609,7 @@ def cleanup_state(state, active_event_id):
 def trigger_already_sent(event_state, trigger_key):
     legacy_keys = {
         "12_msk": ("12_msk", "3h", "2h"),
-        "16_msk": ("16_msk", "1h", "15m"),
+        "18_msk": ("18_msk", "16_msk", "1h", "15m"),
     }
     sent = event_state.get("sent") or {}
     return any(sent.get(key) for key in legacy_keys.get(trigger_key, (trigger_key,)))

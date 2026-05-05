@@ -18,6 +18,8 @@ HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
 SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
 RACE_PAGE_BUTTON_LABEL = "ХОЧУ ПОЕХАТЬ!"
+COPY_SERVER_BUTTON_LABEL = "СЕРВЕР"
+COPY_PASSWORD_BUTTON_LABEL = "ПАРОЛЬ"
 WEATHER_SUMMARY_LABELS = {
     "clear": "Clear",
     "mixed": "Mixed clouds",
@@ -162,20 +164,51 @@ def build_details_url(item):
     return f"{HOURLY_PAGE_URL}{details_url.lstrip('./')}"
 
 
-def build_telegram_button_markup(details_url):
-    return json.dumps(
-        {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": RACE_PAGE_BUTTON_LABEL,
-                        "url": details_url,
-                    }
-                ]
-            ]
-        },
-        ensure_ascii=False,
-    )
+def get_server_name(item):
+    server = item.get("server") if isinstance(item.get("server"), dict) else {}
+    for candidate in (server.get("name"), server.get("full_name")):
+        text = str(candidate or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def get_server_password(item):
+    server = item.get("server") if isinstance(item.get("server"), dict) else {}
+    return str(server.get("password") or "").strip()
+
+
+def build_telegram_button_markup(item, details_url):
+    rows = [
+        [
+            {
+                "text": RACE_PAGE_BUTTON_LABEL,
+                "url": details_url,
+            }
+        ]
+    ]
+
+    copy_buttons = []
+    server_name = get_server_name(item)
+    server_password = get_server_password(item)
+    if server_name:
+        copy_buttons.append(
+            {
+                "text": COPY_SERVER_BUTTON_LABEL,
+                "copy_text": {"text": server_name},
+            }
+        )
+    if server_password:
+        copy_buttons.append(
+            {
+                "text": COPY_PASSWORD_BUTTON_LABEL,
+                "copy_text": {"text": server_password},
+            }
+        )
+    if copy_buttons:
+        rows.append(copy_buttons)
+
+    return json.dumps({"inline_keyboard": rows}, ensure_ascii=False)
 
 
 def build_discord_link_button(details_url):
@@ -441,6 +474,8 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
     weather_summary = build_weather_summary(item)
+    server_name = get_server_name(item)
+    server_password = get_server_password(item)
 
     lines = [
         build_notification_title(item, trigger_key, time_until_start),
@@ -449,6 +484,10 @@ def build_plain_message(item, trigger_key, time_until_start=None):
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
     ]
+    if server_name:
+        lines.append(f"Server: {server_name}")
+    if server_password:
+        lines.append(f"Password: {server_password}")
     if weather_summary:
         lines.append(f"Weather: {weather_summary}")
 
@@ -469,6 +508,8 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     title = escape(build_notification_title(item, trigger_key, time_until_start))
     hype_line = build_hype_line(trigger_key, time_until_start, channel="telegram")
     registrations = item.get("registrations")
+    server_name = escape(get_server_name(item))
+    server_password = escape(get_server_password(item))
 
     lines = [
         f"🏁 <b>{title}</b>",
@@ -482,6 +523,10 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     if registrations not in (None, ""):
         lines.append(f"👥 <b>Registered drivers:</b> {escape(str(registrations))}")
 
+    if server_name:
+        lines.append(f"<b>Server:</b> <code>{server_name}</code>")
+    if server_password:
+        lines.append(f"<b>Password:</b> <code>{server_password}</code>")
     return "\n".join(lines)
 
 
@@ -494,12 +539,18 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     registrations = item.get("registrations")
     image_url = build_track_image_url(item)
     weather_summary = build_weather_summary(item)
+    server_name = get_server_name(item)
+    server_password = get_server_password(item)
 
     fields = [
         {"name": "Track", "value": track_name, "inline": True},
         {"name": "Date", "value": date_str, "inline": True},
         {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
     ]
+    if server_name:
+        fields.append({"name": "Server", "value": f"`{server_name}`", "inline": False})
+    if server_password:
+        fields.append({"name": "Password", "value": f"`{server_password}`", "inline": True})
     if weather_summary:
         fields.append({"name": "Weather", "value": weather_summary, "inline": False})
     if registrations not in (None, ""):
@@ -525,7 +576,7 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     }
 
 
-def send_telegram_message(message, details_url):
+def send_telegram_message(message, item, details_url):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     if not bot_token or not chat_id:
@@ -536,7 +587,7 @@ def send_telegram_message(message, details_url):
             "chat_id": chat_id,
             "text": message,
             "disable_web_page_preview": "false",
-            "reply_markup": build_telegram_button_markup(details_url),
+            "reply_markup": build_telegram_button_markup(item, details_url),
         }
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -546,7 +597,7 @@ def send_telegram_message(message, details_url):
     return True
 
 
-def send_telegram_photo(caption, image_url, details_url):
+def send_telegram_photo(caption, image_url, item, details_url):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     if not bot_token or not chat_id or not image_url:
@@ -558,7 +609,7 @@ def send_telegram_photo(caption, image_url, details_url):
             "photo": image_url,
             "caption": caption,
             "parse_mode": "HTML",
-            "reply_markup": build_telegram_button_markup(details_url),
+            "reply_markup": build_telegram_button_markup(item, details_url),
         }
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
@@ -615,6 +666,7 @@ def dispatch(item, trigger_key, time_until_start=None):
             telegram_sent = send_telegram_photo(
                 caption,
                 track_image_url,
+                item,
                 details_url,
             )
         except error.HTTPError as exc:
@@ -625,6 +677,7 @@ def dispatch(item, trigger_key, time_until_start=None):
     if not telegram_sent:
         telegram_sent = send_telegram_message(
             build_plain_message(item, trigger_key, time_until_start),
+            item,
             details_url,
         )
 

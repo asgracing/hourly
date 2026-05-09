@@ -83,7 +83,10 @@ def read_bool_env(name, default_value=False):
     value = os.getenv(name)
     if value is None:
         return default_value
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = value.strip().lower()
+    if not normalized:
+        return default_value
+    return normalized in {"1", "true", "yes", "on"}
 
 
 def get_now(target_tz=None):

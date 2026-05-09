@@ -91,10 +91,13 @@ Optional GitHub repository variables:
 - `HOURLY_ANNOUNCEMENT_URL`
 - `HOURLY_SCHEDULE_URL`
 - `HOURLY_VOTES_API_BASE`
+- `TELEGRAM_PIN_MESSAGE` - pin Telegram notifications after sending; enabled by default
+- `TELEGRAM_PIN_DISABLE_NOTIFICATION` - set to `true` to pin silently; default is `false`, so Telegram sends the pin notification to group members
 
 Notes:
 - `workflow_dispatch` can be used for a dry run from the Actions tab
 - `workflow_dispatch` also supports `force_send=true` for an immediate test message without waiting for the notification window
+- Telegram auto-pin requires the bot to be a group admin with the `can_pin_messages` right
 - for local debugging you can set `HOURLY_NOTIFY_NOW=2026-04-27T12:00:00+03:00` to emulate the current time
 - the scheduled workflow wakes up every 5 minutes from `10:00` through `20:59` Moscow time; `.github/hourly_notify_state.json` prevents duplicates inside each fixed window
 - scheduled workflows on GitHub only run from the default branch, so this branch can be tested manually but must be merged into the default branch before cron notifications will start

@@ -79,6 +79,13 @@ def read_int_env(name, default_value):
         return default_value
 
 
+def read_bool_env(name, default_value=False):
+    value = os.getenv(name)
+    if value is None:
+        return default_value
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def get_now(target_tz=None):
     tzinfo = target_tz or timezone.utc
     raw = os.getenv("HOURLY_NOTIFY_NOW", "").strip()
@@ -576,6 +583,61 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     }
 
 
+def telegram_pin_enabled():
+    return read_bool_env("TELEGRAM_PIN_MESSAGE", True)
+
+
+def telegram_pin_disable_notification():
+    return read_bool_env("TELEGRAM_PIN_DISABLE_NOTIFICATION", False)
+
+
+def read_telegram_response(response):
+    raw = response.read().decode("utf-8")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def get_telegram_message_id(payload):
+    result = payload.get("result") if isinstance(payload, dict) else {}
+    message_id = result.get("message_id") if isinstance(result, dict) else None
+    return message_id if isinstance(message_id, int) else None
+
+
+def pin_telegram_message(bot_token, chat_id, message_id):
+    if not telegram_pin_enabled() or not message_id:
+        return False
+
+    payload = parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "disable_notification": "true" if telegram_pin_disable_notification() else "false",
+        }
+    ).encode("utf-8")
+    url = f"https://api.telegram.org/bot{bot_token}/pinChatMessage"
+    req = request.Request(url, data=payload, method="POST")
+    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+        response.read()
+    return True
+
+
+def maybe_pin_telegram_message(bot_token, chat_id, payload):
+    message_id = get_telegram_message_id(payload)
+    if not message_id:
+        print("telegram pin skipped: send response has no message_id")
+        return
+    try:
+        if pin_telegram_message(bot_token, chat_id, message_id):
+            print(f"telegram message pinned: {message_id}")
+    except error.HTTPError as exc:
+        print(f"telegram pin failed: {exc.code} {exc.reason}; continue without pin")
+    except Exception as exc:
+        print(f"telegram pin failed: {exc}; continue without pin")
+
+
 def send_telegram_message(message, item, details_url):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
@@ -593,7 +655,8 @@ def send_telegram_message(message, item, details_url):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     req = request.Request(url, data=payload, method="POST")
     with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
-        response.read()
+        sent_payload = read_telegram_response(response)
+    maybe_pin_telegram_message(bot_token, chat_id, sent_payload)
     return True
 
 
@@ -615,7 +678,8 @@ def send_telegram_photo(caption, image_url, item, details_url):
     url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
     req = request.Request(url, data=payload, method="POST")
     with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
-        response.read()
+        sent_payload = read_telegram_response(response)
+    maybe_pin_telegram_message(bot_token, chat_id, sent_payload)
     return True
 
 

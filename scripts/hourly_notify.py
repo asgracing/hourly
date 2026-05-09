@@ -20,6 +20,8 @@ SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
 RACE_PAGE_BUTTON_LABEL = "ХОЧУ ПОЕХАТЬ!"
 COPY_SERVER_BUTTON_LABEL = "СЕРВЕР"
 COPY_PASSWORD_BUTTON_LABEL = "ПАРОЛЬ"
+DEFAULT_TELEGRAM_SERVER_NAME = "ASG Racing 1H Race"
+DEFAULT_TELEGRAM_SERVER_PASSWORD = "ghbdtn"
 WEATHER_SUMMARY_LABELS = {
     "clear": "Clear",
     "mixed": "Mixed clouds",
@@ -447,6 +449,24 @@ def format_time_until_start(time_until_start):
     return " ".join(parts) if parts else "now"
 
 
+def format_time_until_start_ru(time_until_start):
+    if time_until_start is None:
+        return None
+
+    total_seconds = int(time_until_start.total_seconds())
+    if total_seconds <= 0:
+        return "уже сейчас"
+
+    total_minutes = max(1, (total_seconds + 59) // 60)
+    hours, minutes = divmod(total_minutes, 60)
+    parts = []
+    if hours:
+        parts.append(f"{hours} ч")
+    if minutes:
+        parts.append(f"{minutes} мин")
+    return " ".join(parts) if parts else "уже сейчас"
+
+
 def build_notification_title(item, trigger_key, time_until_start=None):
     lead = format_time_until_start(time_until_start)
     track_name = item.get("track_name") or "Unknown track"
@@ -455,6 +475,16 @@ def build_notification_title(item, trigger_key, time_until_start=None):
     if not lead:
         return f"ASG Racing reminder for {track_name}"
     return f"{track_name} starts in {lead}"
+
+
+def build_telegram_title(item, trigger_key, time_until_start=None):
+    track_name = item.get("track_name") or "Unknown track"
+    lead = format_time_until_start_ru(time_until_start)
+    if trigger_key == "test":
+        return f"Тест уведомления ASG Racing: {track_name}"
+    if lead:
+        return f"Гонка на {track_name} через {lead}"
+    return f"Гонка ASG Racing на {track_name}"
 
 
 def build_hype_prefix(channel="plain"):
@@ -477,6 +507,16 @@ def build_hype_line(trigger_key, time_until_start=None, channel="plain"):
             return f"{prefix} {lead} to go. Evening reminder for the next hourly race."
         return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
     return f"{prefix} Quick delivery check for the hourly notifier."
+
+
+def build_telegram_hype_line(trigger_key, time_until_start=None):
+    lead = format_time_until_start_ru(time_until_start)
+    prefix = "🔥🔥🔥 <b>В 5 раз больше очков!</b> 🔥🔥🔥"
+    if trigger_key == "12_msk":
+        return f"{prefix} До ближайшей часовой гонки осталось {lead}." if lead else f"{prefix} Дневное напоминание о часовой гонке."
+    if trigger_key == "18_msk":
+        return f"{prefix} До вечерней часовой гонки осталось {lead}." if lead else f"{prefix} Вечернее напоминание о часовой гонке."
+    return f"{prefix} Проверяем доставку уведомлений."
 
 
 def build_plain_message(item, trigger_key, time_until_start=None):
@@ -512,33 +552,61 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     return "\n".join(lines)
 
 
+def build_telegram_text_message(item, trigger_key, time_until_start=None):
+    track_name = item.get("track_name") or "Unknown track"
+    start_time_local = str(item.get("start_time_local") or "--").strip()
+    timezone_label = str(item.get("timezone") or "UTC").strip()
+    date_str = format_display_date(item.get("date"))
+    registrations = item.get("registrations")
+    weather_summary = build_weather_summary(item)
+    server_name = get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME
+    server_password = get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD
+
+    lines = [
+        build_telegram_title(item, trigger_key, time_until_start),
+        build_telegram_hype_line(trigger_key, time_until_start).replace("<b>", "").replace("</b>", ""),
+        f"Трасса: {track_name}",
+        f"Дата: {date_str}",
+        f"Старт: {start_time_local} {timezone_label}".strip(),
+    ]
+    if registrations not in (None, ""):
+        lines.append(f"Участников: {registrations}")
+    lines.append(f"Сервер: {server_name}")
+    lines.append(f"Пароль: {server_password}")
+    if weather_summary:
+        lines.append(f"Погода: {weather_summary}")
+
+    description = str(item.get("description") or "").strip()
+    if description:
+        lines.append(description)
+    return "\n".join(lines)
+
+
 def build_photo_caption(item, trigger_key, time_until_start=None):
     track_name = escape(str(item.get("track_name") or "Unknown track"))
     date_str = escape(format_display_date(item.get("date")))
     start_time_local = escape(str(item.get("start_time_local") or "--").strip())
     timezone_label = escape(str(item.get("timezone") or "UTC").strip())
-    title = escape(build_notification_title(item, trigger_key, time_until_start))
-    hype_line = build_hype_line(trigger_key, time_until_start, channel="telegram")
+    title = escape(build_telegram_title(item, trigger_key, time_until_start))
+    hype_line = build_telegram_hype_line(trigger_key, time_until_start)
     registrations = item.get("registrations")
-    server_name = escape(get_server_name(item))
-    server_password = escape(get_server_password(item))
+    server_name = escape(get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME)
+    server_password = escape(get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD)
 
     lines = [
         f"🏁 <b>{title}</b>",
         "",
-        f"🔥 {hype_line}",
-        f"📍 <b>Track:</b> {track_name}",
-        f"📅 <b>Date:</b> {date_str}",
-        f"⏰ <b>Start:</b> {start_time_local} {timezone_label}".strip(),
+        hype_line,
+        f"📍 <b>Трасса:</b> {track_name}",
+        f"📅 <b>Дата:</b> {date_str}",
+        f"⏰ <b>Старт:</b> {start_time_local} {timezone_label}".strip(),
     ]
 
     if registrations not in (None, ""):
-        lines.append(f"👥 <b>Registered drivers:</b> {escape(str(registrations))}")
+        lines.append(f"👥 <b>Участников:</b> {escape(str(registrations))}")
 
-    if server_name:
-        lines.append(f"<b>Server:</b> <code>{server_name}</code>")
-    if server_password:
-        lines.append(f"<b>Password:</b> <code>{server_password}</code>")
+    lines.append(f"<b>Сервер:</b> <code>{server_name}</code>")
+    lines.append(f"<b>Пароль:</b> <code>{server_password}</code>")
     return "\n".join(lines)
 
 
@@ -794,8 +862,8 @@ def dispatch(item, trigger_key, time_until_start=None):
         try:
             caption = build_photo_caption(item, trigger_key, time_until_start)
             weather_summary = build_weather_summary(item)
-            if weather_summary and "<b>Weather:</b>" not in caption:
-                caption = f"{caption}\n<b>Weather:</b> {escape(weather_summary)}"
+            if weather_summary and "<b>Погода:</b>" not in caption:
+                caption = f"{caption}\n<b>Погода:</b> {escape(weather_summary)}"
             telegram_sent = send_telegram_photo(
                 caption,
                 track_image_url,
@@ -809,7 +877,7 @@ def dispatch(item, trigger_key, time_until_start=None):
 
     if not telegram_sent:
         telegram_sent = send_telegram_message(
-            build_plain_message(item, trigger_key, time_until_start),
+            build_telegram_text_message(item, trigger_key, time_until_start),
             item,
             details_url,
         )

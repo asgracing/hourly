@@ -31,9 +31,7 @@ DEFAULT_NOON_TRIGGER_HOUR_MSK = 12
 DEFAULT_EVENING_TRIGGER_HOUR_MSK = 18
 DEFAULT_TRIGGER_WINDOW_HOURS = 2
 TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID = None
-TELEGRAM_PREVIOUS_PINNED_CHAT_ID = None
 TELEGRAM_LAST_PINNED_MESSAGE_ID = None
-TELEGRAM_LAST_PINNED_CHAT_ID = None
 
 
 def normalize_event_id(value):
@@ -611,12 +609,11 @@ def read_positive_int(value):
 
 
 def configure_telegram_pin_state(state):
-    global TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID, TELEGRAM_PREVIOUS_PINNED_CHAT_ID
+    global TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID
     telegram_state = state.get("telegram") if isinstance(state, dict) else {}
     if not isinstance(telegram_state, dict):
         telegram_state = {}
     TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID = read_positive_int(telegram_state.get("last_pinned_message_id"))
-    TELEGRAM_PREVIOUS_PINNED_CHAT_ID = str(telegram_state.get("last_pinned_chat_id") or "").strip() or None
 
 
 def update_telegram_pin_state(state):
@@ -627,8 +624,7 @@ def update_telegram_pin_state(state):
         telegram_state = {}
         state["telegram"] = telegram_state
     telegram_state["last_pinned_message_id"] = TELEGRAM_LAST_PINNED_MESSAGE_ID
-    if TELEGRAM_LAST_PINNED_CHAT_ID:
-        telegram_state["last_pinned_chat_id"] = TELEGRAM_LAST_PINNED_CHAT_ID
+    telegram_state.pop("last_pinned_chat_id", None)
 
 
 def read_telegram_response(response):
@@ -647,7 +643,7 @@ def get_telegram_message_id(payload):
 
 
 def pin_telegram_message(bot_token, chat_id, message_id):
-    global TELEGRAM_LAST_PINNED_MESSAGE_ID, TELEGRAM_LAST_PINNED_CHAT_ID
+    global TELEGRAM_LAST_PINNED_MESSAGE_ID
     if not telegram_pin_enabled() or not message_id:
         return False
 
@@ -663,7 +659,6 @@ def pin_telegram_message(bot_token, chat_id, message_id):
     with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
         response.read()
     TELEGRAM_LAST_PINNED_MESSAGE_ID = message_id
-    TELEGRAM_LAST_PINNED_CHAT_ID = chat_id
     return True
 
 
@@ -688,9 +683,8 @@ def maybe_unpin_previous_telegram_message(bot_token, current_chat_id, current_me
     if not previous_message_id or previous_message_id == current_message_id:
         return
 
-    previous_chat_id = TELEGRAM_PREVIOUS_PINNED_CHAT_ID or current_chat_id
     try:
-        if unpin_telegram_message(bot_token, previous_chat_id, previous_message_id):
+        if unpin_telegram_message(bot_token, current_chat_id, previous_message_id):
             print(f"previous telegram pinned message unpinned: {previous_message_id}")
     except error.HTTPError as exc:
         print(f"telegram unpin previous failed: {exc.code} {exc.reason}; continue with latest pin")

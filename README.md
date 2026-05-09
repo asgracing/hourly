@@ -93,6 +93,7 @@ Optional GitHub repository variables:
 - `HOURLY_VOTES_API_BASE`
 - `TELEGRAM_PIN_MESSAGE` - pin Telegram notifications after sending; enabled by default
 - `TELEGRAM_PIN_DISABLE_NOTIFICATION` - set to `true` to pin silently; default is `false`, so Telegram sends the pin notification to group members
+- `TELEGRAM_UNPIN_PREVIOUS_MESSAGE` - unpin the previous notification after the latest one is pinned; enabled by default
 
 Notes:
 - `workflow_dispatch` can be used for a dry run from the Actions tab

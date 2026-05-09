@@ -30,6 +30,10 @@ MSK_TIMEZONE = timezone(timedelta(hours=3))
 DEFAULT_NOON_TRIGGER_HOUR_MSK = 12
 DEFAULT_EVENING_TRIGGER_HOUR_MSK = 18
 DEFAULT_TRIGGER_WINDOW_HOURS = 2
+TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID = None
+TELEGRAM_PREVIOUS_PINNED_CHAT_ID = None
+TELEGRAM_LAST_PINNED_MESSAGE_ID = None
+TELEGRAM_LAST_PINNED_CHAT_ID = None
 
 
 def normalize_event_id(value):
@@ -594,6 +598,39 @@ def telegram_pin_disable_notification():
     return read_bool_env("TELEGRAM_PIN_DISABLE_NOTIFICATION", False)
 
 
+def telegram_unpin_previous_enabled():
+    return read_bool_env("TELEGRAM_UNPIN_PREVIOUS_MESSAGE", True)
+
+
+def read_positive_int(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def configure_telegram_pin_state(state):
+    global TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID, TELEGRAM_PREVIOUS_PINNED_CHAT_ID
+    telegram_state = state.get("telegram") if isinstance(state, dict) else {}
+    if not isinstance(telegram_state, dict):
+        telegram_state = {}
+    TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID = read_positive_int(telegram_state.get("last_pinned_message_id"))
+    TELEGRAM_PREVIOUS_PINNED_CHAT_ID = str(telegram_state.get("last_pinned_chat_id") or "").strip() or None
+
+
+def update_telegram_pin_state(state):
+    if TELEGRAM_LAST_PINNED_MESSAGE_ID is None:
+        return
+    telegram_state = state.setdefault("telegram", {})
+    if not isinstance(telegram_state, dict):
+        telegram_state = {}
+        state["telegram"] = telegram_state
+    telegram_state["last_pinned_message_id"] = TELEGRAM_LAST_PINNED_MESSAGE_ID
+    if TELEGRAM_LAST_PINNED_CHAT_ID:
+        telegram_state["last_pinned_chat_id"] = TELEGRAM_LAST_PINNED_CHAT_ID
+
+
 def read_telegram_response(response):
     raw = response.read().decode("utf-8")
     try:
@@ -610,6 +647,7 @@ def get_telegram_message_id(payload):
 
 
 def pin_telegram_message(bot_token, chat_id, message_id):
+    global TELEGRAM_LAST_PINNED_MESSAGE_ID, TELEGRAM_LAST_PINNED_CHAT_ID
     if not telegram_pin_enabled() or not message_id:
         return False
 
@@ -624,7 +662,40 @@ def pin_telegram_message(bot_token, chat_id, message_id):
     req = request.Request(url, data=payload, method="POST")
     with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
         response.read()
+    TELEGRAM_LAST_PINNED_MESSAGE_ID = message_id
+    TELEGRAM_LAST_PINNED_CHAT_ID = chat_id
     return True
+
+
+def unpin_telegram_message(bot_token, chat_id, message_id):
+    payload = parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "message_id": message_id,
+        }
+    ).encode("utf-8")
+    url = f"https://api.telegram.org/bot{bot_token}/unpinChatMessage"
+    req = request.Request(url, data=payload, method="POST")
+    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+        response.read()
+    return True
+
+
+def maybe_unpin_previous_telegram_message(bot_token, current_chat_id, current_message_id):
+    if not telegram_unpin_previous_enabled():
+        return
+    previous_message_id = TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID
+    if not previous_message_id or previous_message_id == current_message_id:
+        return
+
+    previous_chat_id = TELEGRAM_PREVIOUS_PINNED_CHAT_ID or current_chat_id
+    try:
+        if unpin_telegram_message(bot_token, previous_chat_id, previous_message_id):
+            print(f"previous telegram pinned message unpinned: {previous_message_id}")
+    except error.HTTPError as exc:
+        print(f"telegram unpin previous failed: {exc.code} {exc.reason}; continue with latest pin")
+    except Exception as exc:
+        print(f"telegram unpin previous failed: {exc}; continue with latest pin")
 
 
 def maybe_pin_telegram_message(bot_token, chat_id, payload):
@@ -635,6 +706,7 @@ def maybe_pin_telegram_message(bot_token, chat_id, payload):
     try:
         if pin_telegram_message(bot_token, chat_id, message_id):
             print(f"telegram message pinned: {message_id}")
+            maybe_unpin_previous_telegram_message(bot_token, chat_id, message_id)
     except error.HTTPError as exc:
         print(f"telegram pin failed: {exc.code} {exc.reason}; continue without pin")
     except Exception as exc:
@@ -818,6 +890,7 @@ def run():
     time_until_start = event_start - now
 
     state = load_state(state_file)
+    configure_telegram_pin_state(state)
     event_state = state["events"].setdefault(event_id, {"sent": {}})
     sent_now = []
 
@@ -830,6 +903,7 @@ def run():
             dispatch(announcement, "test")
             print(f"test notification sent for {event_id}")
         state["last_event_id"] = event_id
+        update_telegram_pin_state(state)
         cleanup_state(state, event_id)
         save_state(state_file, state)
         return
@@ -854,6 +928,7 @@ def run():
         sent_now.append(trigger_key)
 
     state["last_event_id"] = event_id
+    update_telegram_pin_state(state)
     cleanup_state(state, event_id)
     save_state(state_file, state)
 

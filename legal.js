@@ -14,7 +14,7 @@
     clickmap: true,
     trackLinks: true,
     accurateTrackBounce: true,
-    webvisor: false
+    webvisor: true
   };
   const METRIKA_COOKIE_NAMES = [
     "_ym_d",

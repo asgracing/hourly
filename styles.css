@@ -457,6 +457,56 @@ h2 {
   gap: 8px;
 }
 
+.hero-connect-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.hero-connect-btn,
+.hero-connect-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.hero-connect-btn {
+  border: 1px solid rgba(255, 209, 102, 0.48);
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.94), rgba(255, 91, 46, 0.92));
+  color: #101418;
+  box-shadow: 0 12px 26px rgba(255, 91, 46, 0.24);
+}
+
+.hero-connect-help {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(236, 243, 255, 0.9);
+}
+
+.hero-connect-btn:hover,
+.hero-connect-btn:focus-visible,
+.hero-connect-help:hover,
+.hero-connect-help:focus-visible {
+  transform: translateY(-1px);
+}
+
+.hero-connect-btn.is-disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.58;
+  filter: grayscale(0.35);
+}
+
 .hero-server-item {
   min-width: 0;
   padding: 11px 12px;

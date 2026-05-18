@@ -2,9 +2,16 @@ const announcementUrl = "https://asgracing.github.io/hourly-data/announcement.js
 const scheduleUrl = "https://asgracing.github.io/hourly-data/schedule.json";
 const recentRacesUrl = "https://asgracing.github.io/hourly-data/races/races.json";
 const recentRaceDetailsBaseUrl = "https://asgracing.github.io/hourly-data/";
+const serverStatusUrl = "https://asgracing.github.io/top-data/server_status.json";
 const votesApiBase =
   document.querySelector('meta[name="hourly-votes-api"]')?.getAttribute("content")?.trim() || "";
 const VOTER_ID_STORAGE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+const ACC_CONNECT_SERVER_FALLBACK = {
+  hostname: "95.165.92.3",
+  port: null,
+  name: "ASG Racing 1H Race",
+  persistent: true
+};
 
 function getLegalUrls() {
   const fallbackBase =
@@ -97,6 +104,9 @@ const translations = {
     heroRefuelLabel: "Refuel",
     heroTyresLabel: "Tyres",
     heroWeatherLabel: "Weather",
+    serverConnectBtn: "Connect",
+    serverConnectHowTo: "How to?",
+    serverConnectUnavailable: "Add public server IP/host to enable direct connect",
     copyAction: "Copy {field}",
     copiedAction: "{field} copied",
     announcementEyebrow: "Next Event",
@@ -214,6 +224,9 @@ const translations = {
     heroRefuelLabel: "Заправка",
     heroTyresLabel: "Шины",
     heroWeatherLabel: "Погода",
+    serverConnectBtn: "Подключиться",
+    serverConnectHowTo: "Как подключиться?",
+    serverConnectUnavailable: "Укажите публичный IP/host сервера, чтобы включить прямое подключение",
     announcementEyebrow: "Ближайший старт",
     scheduleEyebrow: "План",
     archiveEyebrow: "Архив",
@@ -321,6 +334,7 @@ Object.assign(translations.ru, {
 
 let currentLang = "en";
 let announcementData = {};
+let serverStatusData = null;
 let scheduleItems = [];
 let recentRaceItems = [];
 let selectedScheduleItem = null;
@@ -492,6 +506,62 @@ function buildEntryTokenGroups(server) {
   if (typeof server.track_medals_requirement === "number" && server.track_medals_requirement > 0) tokens.push(createHeroToken(tf("entryTrackMedals", { value: server.track_medals_requirement }), "muted"));
   if (typeof server.racecraft_rating_requirement === "number" && server.racecraft_rating_requirement > 0) tokens.push(createHeroToken(tf("entryRacecraft", { value: server.racecraft_rating_requirement }), "muted"));
   return [tokens];
+}
+
+function pickFirstNonEmpty(...values) {
+  return values.find(value => String(value ?? "").trim()) ?? "";
+}
+
+function normalizeAccConnectConfig(server, fallback = {}) {
+  const hostname = String(pickFirstNonEmpty(
+    server?.acc_connect_hostname,
+    server?.connect_hostname,
+    server?.hostname,
+    server?.host,
+    server?.ip,
+    fallback.hostname
+  )).trim();
+  const port = Number(pickFirstNonEmpty(
+    server?.acc_connect_port,
+    server?.tcp_port,
+    server?.tcpPort,
+    server?.port,
+    fallback.port
+  ));
+  const name = String(pickFirstNonEmpty(
+    server?.acc_connect_name,
+    fallback.name,
+    server?.name,
+    server?.full_name
+  )).trim();
+
+  return {
+    hostname,
+    port,
+    name,
+    persistent: server?.persistent ?? fallback.persistent ?? true
+  };
+}
+
+function buildAccConnectHref(config) {
+  if (!config?.hostname || !Number.isFinite(config.port) || config.port <= 0) return "";
+  const url = new URL(`acc-connect://${config.hostname}:${config.port}/`);
+  if (config.name) url.searchParams.set("name", config.name);
+  if (config.persistent) url.searchParams.set("persistent", "true");
+  return url.href;
+}
+
+function updateHeroConnectLink(server) {
+  const link = document.getElementById("hero-connect-link");
+  if (!link) return;
+
+  const hourlyStatus = serverStatusData?.servers?.hourly || serverStatusData?.hourly || {};
+  const href = buildAccConnectHref(normalizeAccConnectConfig({ ...server, ...hourlyStatus }, ACC_CONNECT_SERVER_FALLBACK));
+  link.textContent = t("serverConnectBtn");
+  link.classList.toggle("is-disabled", !href);
+  link.setAttribute("aria-disabled", href ? "false" : "true");
+  link.setAttribute("title", href ? t("serverConnectBtn") : t("serverConnectUnavailable"));
+  link.href = href || "#";
 }
 function buildRaceFormatTokenGroups(session) {
   if (!session || typeof session !== "object") return [];
@@ -1034,6 +1104,7 @@ function renderHeroDetails(data) {
   setHeroTokenValue("hero-refuel-rules", buildRefuelTokenGroups(rules));
   setHeroTokenValue("hero-tyre-rules", buildTyreTokenGroups(rules));
   setHeroTokenValue("hero-weather", buildWeatherTokenGroups(weather));
+  updateHeroConnectLink(server);
 }
 function renderSchedule(rows) {
   const container = document.getElementById("schedule-list");
@@ -1472,8 +1543,14 @@ async function init() {
   bindWeatherModal();
   renderUI();
   try {
-    const [announcement, schedule, recentRaces] = await Promise.all([loadJson(announcementUrl), loadJson(scheduleUrl), loadJson(recentRacesUrl)]);
+    const [announcement, schedule, recentRaces, serverStatus] = await Promise.all([
+      loadJson(announcementUrl),
+      loadJson(scheduleUrl),
+      loadJson(recentRacesUrl),
+      loadJson(serverStatusUrl).catch(() => null)
+    ]);
     announcementData = announcement || {};
+    serverStatusData = serverStatus && typeof serverStatus === "object" ? serverStatus : null;
     scheduleItems = Array.isArray(schedule?.items) ? schedule.items : [];
     recentRaceItems = Array.isArray(recentRaces?.items) ? recentRaces.items : [];
     await loadVotesForSchedule(scheduleItems.slice(0, 3));

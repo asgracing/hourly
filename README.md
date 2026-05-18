@@ -21,22 +21,23 @@ Recommended config paths in `schedule_config.json`:
 
 Optional planned weather config in `schedule_config.json`:
 - `weather_planning.slots_ahead`: how many future slots keep a locked weather plan for; default `3`
-- `weather_planning.ambient_temp_range_c`: global ambient temperature range, for example `[14, 24]`
+- `weather_planning.ambient_temp_range_c`: global ambient temperature range, for example `[25, 30]`
 - `weather_planning.profiles`: weighted scenario list used only when a slot gets weather for the first time
 
 Example `weather_planning` block:
 ```json
 "weather_planning": {
   "slots_ahead": 3,
-  "ambient_temp_range_c": [14, 24],
+  "ambient_temp_range_c": [25, 30],
   "profiles": [
-    { "id": 1, "weight": 25, "cloud_range": [0.0, 0.15], "rain_range": [0.0, 0.0], "randomness_range": [0, 2], "summary_key": "clear" },
-    { "id": 2, "weight": 25, "cloud_range": [0.65, 0.9], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "cloudy" },
-    { "id": 3, "weight": 25, "cloud_range": [0.35, 0.7], "rain_range": [0.0, 0.12], "randomness_range": [4, 7], "summary_key": "mixed" },
-    { "id": 4, "weight": 25, "cloud_range": [0.7, 0.95], "rain_range": [0.22, 0.35], "randomness_range": [2, 5], "summary_key": "wet" }
+    { "id": 1, "weight": 40, "cloud_range": [0.05, 0.25], "rain_range": [0.0, 0.0], "randomness_range": [1, 3], "summary_key": "clear" },
+    { "id": 2, "weight": 40, "cloud_range": [0.3, 0.5], "rain_range": [0.04, 0.09], "randomness_range": [5, 6], "summary_key": "mixed" },
+    { "id": 3, "weight": 20, "cloud_range": [0.8, 1.0], "rain_range": [0.35, 0.55], "randomness_range": [2, 4], "summary_key": "wet" }
   ]
 }
 ```
+
+The clear profile keeps `rain` at 0 and `weatherRandomness` below 4, which should keep it dry while allowing light natural cloud variation. The second profile is tuned for a mostly sunny/mixed slot where clouds can build quickly and produce light rain. ACC does not expose a hard "rain at least once" switch.
 
 Runtime behavior:
 - publisher builds the next `3` slots, creates missing planned weather once, and stores it in `config/runtime_state.json`

@@ -126,27 +126,52 @@ function parseVoteComment(commentBody) {
   return voterId || null;
 }
 
-async function githubFetch(env, path, init = {}) {
+function normalizeGithubToken(value) {
+  return String(value || "").replace(/[\s\u0000-\u001f\u007f]+/g, "");
+}
+
+function hasGithubToken(env) {
+  return Boolean(normalizeGithubToken(env.GITHUB_TOKEN));
+}
+
+async function githubFetch(env, path, init = {}, options = {}) {
+  const headers = {
+    accept: "application/vnd.github+json",
+    "x-github-api-version": "2022-11-28",
+    "user-agent": "hourly-votes-worker",
+    ...init.headers
+  };
+  if (options.authenticated !== false) {
+    headers.authorization = `token ${normalizeGithubToken(env.GITHUB_TOKEN)}`;
+  }
   const response = await fetch(`https://api.github.com${path}`, {
     ...init,
-    headers: {
-      accept: "application/vnd.github+json",
-      authorization: `Bearer ${env.GITHUB_TOKEN}`,
-      "user-agent": "hourly-votes-worker",
-      ...init.headers
-    }
+    headers
   });
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`GitHub API ${response.status}: ${details}`);
+    throw new Error(`GitHub API ${response.status} ${path}: ${details}`);
   }
   return response;
 }
 
-async function searchIssues(env, query) {
-  const response = await githubFetch(env, `/search/issues?q=${encodeURIComponent(query)}`);
-  const data = await response.json();
-  return Array.isArray(data.items) ? data.items : [];
+async function listHourlyVoteIssues(env) {
+  const owner = env.GITHUB_REPO_OWNER;
+  const repo = env.GITHUB_REPO_NAME;
+  const issues = [];
+  for (let page = 1; page <= 5; page += 1) {
+    const params = new URLSearchParams({
+      state: "all",
+      per_page: "100",
+      page: String(page)
+    });
+    const response = await githubFetch(env, `/repos/${owner}/${repo}/issues?${params.toString()}`, {}, { authenticated: hasGithubToken(env) });
+    const data = await response.json();
+    if (!Array.isArray(data) || !data.length) break;
+    issues.push(...data.filter(issue => !issue?.pull_request));
+    if (data.length < 100) break;
+  }
+  return issues;
 }
 
 function dedupeIssues(issues) {
@@ -175,18 +200,13 @@ function chooseCanonicalIssue(issues, eventId) {
 
 async function findIssues(env, eventId, slotHint = null) {
   const canonicalEventId = canonicalizeEventId(eventId);
-  const titleMatches = await searchIssues(
-    env,
-    `repo:${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME} is:issue label:hourly-vote in:title "${issueTitle(canonicalEventId)}"`
-  );
+  const allIssues = await listHourlyVoteIssues(env);
+  const titleMatches = allIssues.filter(issue => issue?.title === issueTitle(canonicalEventId));
   const slotMetadata = buildSlotMetadata({ event_id: canonicalEventId, date: slotHint?.date, time: slotHint?.time });
   if (!slotMetadata.date || !slotMetadata.time) {
     return dedupeIssues(titleMatches);
   }
-  const slotMatches = await searchIssues(
-    env,
-    `repo:${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME} is:issue label:hourly-vote "date: ${slotMetadata.date}" "time: ${slotMetadata.time}"`
-  );
+  const slotMatches = allIssues.filter(issue => slotMetadataMatches(parseIssueMetadata(issue?.body), slotMetadata));
   return dedupeIssues(
     [...titleMatches, ...slotMatches].filter(issue => {
       if (issue?.title === issueTitle(canonicalEventId)) return true;
@@ -211,7 +231,6 @@ async function createIssue(env, slot) {
       headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify({
         title: issueTitle(metadata.event_id),
-        labels: ["hourly-vote", "slot-vote"],
         body: buildIssueBody(metadata)
       })
     }
@@ -228,7 +247,9 @@ async function ensureIssue(env, slot, issues = []) {
 async function listVoteComments(env, issueNumber) {
   const response = await githubFetch(
     env,
-    `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issueNumber}/comments?per_page=100`
+    `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issueNumber}/comments?per_page=100`,
+    {},
+    { authenticated: hasGithubToken(env) }
   );
   const comments = await response.json();
   return Array.isArray(comments) ? comments : [];

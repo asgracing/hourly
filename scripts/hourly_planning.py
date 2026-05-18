@@ -10,34 +10,26 @@ DEFAULT_VISIBLE_SLOTS = 3
 DEFAULT_WEATHER_PROFILES = [
     {
         "id": 1,
-        "weight": 25,
-        "cloud_range": [0.0, 0.15],
+        "weight": 40,
+        "cloud_range": [0.05, 0.25],
         "rain_range": [0.0, 0.0],
-        "randomness_range": [0, 2],
+        "randomness_range": [1, 3],
         "summary_key": "clear",
     },
     {
         "id": 2,
-        "weight": 25,
-        "cloud_range": [0.65, 0.9],
-        "rain_range": [0.0, 0.0],
-        "randomness_range": [1, 3],
-        "summary_key": "cloudy",
-    },
-    {
-        "id": 3,
-        "weight": 25,
-        "cloud_range": [0.35, 0.7],
-        "rain_range": [0.0, 0.12],
-        "randomness_range": [4, 7],
+        "weight": 40,
+        "cloud_range": [0.3, 0.5],
+        "rain_range": [0.04, 0.09],
+        "randomness_range": [5, 6],
         "summary_key": "mixed",
     },
     {
-        "id": 4,
-        "weight": 25,
-        "cloud_range": [0.7, 0.95],
-        "rain_range": [0.22, 0.35],
-        "randomness_range": [2, 5],
+        "id": 3,
+        "weight": 20,
+        "cloud_range": [0.8, 1.0],
+        "rain_range": [0.35, 0.55],
+        "randomness_range": [2, 4],
         "summary_key": "wet",
     },
 ]
@@ -183,8 +175,8 @@ def get_weather_planning_config(schedule_config: dict):
 
     ambient_temp_range = normalize_number_range(
         planning.get("ambient_temp_range_c"),
-        14,
-        24,
+        25,
+        30,
         minimum=-20,
         maximum=60,
     )

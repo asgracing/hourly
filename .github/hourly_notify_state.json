@@ -360,9 +360,12 @@
         "12_msk": "2026-05-20T10:24:25+00:00",
         "18_msk": "2026-05-20T16:17:58+00:00"
       }
+    },
+    "hourly_2026-05-21_2100": {
+      "sent": {}
     }
   },
-  "last_event_id": "hourly_2026-05-20_2100",
+  "last_event_id": "hourly_2026-05-21_2100",
   "telegram": {
     "last_pinned_message_id": 24746
   }

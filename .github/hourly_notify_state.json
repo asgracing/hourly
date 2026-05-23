@@ -374,11 +374,13 @@
       }
     },
     "hourly_2026-05-23_2100": {
-      "sent": {}
+      "sent": {
+        "12_msk": "2026-05-23T09:01:29+00:00"
+      }
     }
   },
   "last_event_id": "hourly_2026-05-23_2100",
   "telegram": {
-    "last_pinned_message_id": 25227
+    "last_pinned_message_id": 25394
   }
 }

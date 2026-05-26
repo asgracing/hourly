@@ -820,6 +820,15 @@ async function loadJson(url) {
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
   return response.json();
 }
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 function formatDate(isoDate) {
   if (!isoDate) return "--";
   const date = new Date(`${isoDate}T00:00:00+03:00`);
@@ -903,7 +912,7 @@ async function loadVotesForSchedule(items) {
     const url = new URL("/votes", votesApiBase);
     url.searchParams.set("event_ids", eventIds.join(","));
     url.searchParams.set("voter_id", getBrowserVoterId());
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetchWithTimeout(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     if (payload?.items && typeof payload.items === "object") {
@@ -1659,9 +1668,11 @@ async function init() {
     serverStatusData = serverStatus && typeof serverStatus === "object" ? serverStatus : null;
     scheduleItems = buildScheduleItems(schedule, announcementData);
     recentRaceItems = Array.isArray(recentRaces) ? recentRaces : [];
-    await loadVotesForSchedule(scheduleItems.slice(0, 3));
     hasLoadError = false;
     renderUI();
+    loadVotesForSchedule(scheduleItems.slice(0, 3)).finally(() => {
+      renderUI();
+    });
   } catch (error) {
     console.error(error);
     hasLoadError = true;

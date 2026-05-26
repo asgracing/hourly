@@ -79,7 +79,7 @@ Track switching flow:
 The repository includes `scripts/hourly_notify.py` and `.github/workflows/hourly-notify.yml` for Telegram and Discord reminders about the nearest hourly event.
 
 What it does:
-- loads the next event from `https://asgracing.github.io/hourly-data/announcement.json`
+- loads the next event from `https://data.asgracing.ru/hourly-data/announcement.json`
 - sends reminders in the `12:00 MSK +/-2h` and `18:00 MSK +/-2h` windows
 - stores sent-state in `.github/hourly_notify_state.json` so the same event is not announced twice
 
@@ -98,7 +98,7 @@ Optional GitHub repository variables:
 
 Notes:
 - `workflow_dispatch` can be used for a dry run from the Actions tab
-- `workflow_dispatch` also supports `force_send=true` for an immediate test message without waiting for the notification window
+- `workflow_dispatch` sends a real immediate test only when `force_send=true` and `dry_run=false`
 - Telegram auto-pin requires the bot to be a group admin with the `can_pin_messages` right
 - for local debugging you can set `HOURLY_NOTIFY_NOW=2026-04-27T12:00:00+03:00` to emulate the current time
 - the scheduled workflow wakes up every 5 minutes from `10:00` through `20:59` Moscow time; `.github/hourly_notify_state.json` prevents duplicates inside each fixed window

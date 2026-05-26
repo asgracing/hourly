@@ -8,8 +8,8 @@ from urllib import error, parse, request
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ANNOUNCEMENT_URL = "https://asgracing.github.io/hourly-data/announcement.json"
-DEFAULT_SCHEDULE_URL = "https://asgracing.github.io/hourly-data/schedule.json"
+DEFAULT_ANNOUNCEMENT_URL = "https://data.asgracing.ru/hourly-data/announcement.json"
+DEFAULT_SCHEDULE_URL = "https://data.asgracing.ru/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"

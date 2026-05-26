@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Print message without sending notifications"
+        description: "Print message without sending notifications. Set false together with force_send=true to send manually."
         required: false
         default: "true"
       force_send:
-        description: "Send a test notification without waiting for the notification window"
+        description: "Build and send immediately, without waiting for the 12:00/18:00 MSK window"
         required: false
         default: "false"
   schedule:

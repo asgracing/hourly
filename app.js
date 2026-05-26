@@ -357,6 +357,28 @@ let announcementData = {};
 let serverStatusData = null;
 let scheduleItems = [];
 let recentRaceItems = [];
+
+function buildScheduleItems(schedule, announcement) {
+  const items = Array.isArray(schedule?.items) ? schedule.items : [];
+  if (items.length) return items;
+  if (!announcement?.date || !announcement?.start_time_local) return [];
+  return [
+    {
+      event_id:
+        announcement.event_id ||
+        `hourly_${announcement.date}_${String(announcement.start_time_local).replace(/[^0-9]/g, "")}`,
+      date: announcement.date,
+      start_time_local: announcement.start_time_local,
+      timezone: announcement.timezone,
+      track_code: announcement.track_code,
+      track_name: announcement.track_name,
+      slot_label: announcement.session_label,
+      status: announcement.status,
+      weather: announcement.weather,
+      rain_level: announcement.weather?.rain_level
+    }
+  ];
+}
 let recentRacesPage = 1;
 let recentRacesPageSize = 10;
 let recentRacesTotalItems = 0;
@@ -1635,7 +1657,7 @@ async function init() {
     ]);
     announcementData = announcement || {};
     serverStatusData = serverStatus && typeof serverStatus === "object" ? serverStatus : null;
-    scheduleItems = Array.isArray(schedule?.items) ? schedule.items : [];
+    scheduleItems = buildScheduleItems(schedule, announcementData);
     recentRaceItems = Array.isArray(recentRaces) ? recentRaces : [];
     await loadVotesForSchedule(scheduleItems.slice(0, 3));
     hasLoadError = false;

@@ -1,8 +1,28 @@
-const announcementUrl = "https://asgracing.github.io/hourly-data/announcement.json";
-const scheduleUrl = "https://asgracing.github.io/hourly-data/schedule.json";
-const recentRacesUrl = "https://asgracing.github.io/hourly-data/races/races.json";
-const recentRaceDetailsBaseUrl = "https://asgracing.github.io/hourly-data/";
-const serverStatusUrl = "https://asgracing.github.io/top-data/server_status.json";
+const pageParams = new URLSearchParams(window.location.search);
+function normalizeBaseUrl(value) {
+  return String(value || "").replace(/\/+$/, "");
+}
+const hourlyApiBase = normalizeBaseUrl(pageParams.get("hourlyApiBase"));
+const topApiBase = normalizeBaseUrl(pageParams.get("topApiBase"));
+const topApiRoot = topApiBase.replace(/\/top-data\/v2$/i, "");
+const hourlyApiRoot = hourlyApiBase.replace(/\/hourly-data$/i, "");
+const isAsgPublicSite = /(^|\.)asgracing\.ru$/i.test(window.location.hostname);
+const defaultHourlyDataBaseUrl = isAsgPublicSite
+  ? "https://data.asgracing.ru/hourly-data"
+  : window.location.hostname === "asgracing.github.io"
+    ? "https://asgracing.github.io/hourly-data"
+    : "/hourly-data";
+const defaultTopDataBaseUrl = isAsgPublicSite
+  ? "https://data.asgracing.ru/top-data"
+  : window.location.hostname === "asgracing.github.io"
+    ? "https://asgracing.github.io/top-data"
+    : "/top-data";
+const hourlyDataBaseUrl = hourlyApiBase || defaultHourlyDataBaseUrl;
+const announcementUrl = `${hourlyDataBaseUrl}/announcement.json`;
+const scheduleUrl = `${hourlyDataBaseUrl}/schedule.json`;
+const recentRacesUrl = `${hourlyDataBaseUrl}/races/races.json`;
+const recentRaceDetailsBaseUrl = `${hourlyDataBaseUrl}/`;
+const serverStatusUrl = pageParams.get("serverStatusUrl") || (topApiRoot || hourlyApiRoot ? `${topApiRoot || hourlyApiRoot}/server-status` : `${defaultTopDataBaseUrl}/server_status.json`);
 const votesApiBase =
   document.querySelector('meta[name="hourly-votes-api"]')?.getAttribute("content")?.trim() || "";
 const VOTER_ID_STORAGE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -337,6 +357,10 @@ let announcementData = {};
 let serverStatusData = null;
 let scheduleItems = [];
 let recentRaceItems = [];
+let recentRacesPage = 1;
+let recentRacesPageSize = 10;
+let recentRacesTotalItems = 0;
+let recentRacesTotalPages = 1;
 let selectedScheduleItem = null;
 let selectedRace = null;
 let hasLoadError = false;
@@ -1181,6 +1205,66 @@ function renderRecentRaces(rows) {
     row.addEventListener("click", event => { if (!event.target.closest("a")) openRow(); });
     row.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRow(); } });
   });
+  renderRecentRacesPagination(container);
+}
+function buildRecentRacesPageUrl(page) {
+  const url = new URL(recentRacesUrl, window.location.href);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("page_size", String(recentRacesPageSize));
+  return url.toString();
+}
+async function loadRecentRacesPage(page = 1) {
+  const payload = await loadJson(buildRecentRacesPageUrl(page));
+  const allItems = Array.isArray(payload?.items) ? payload.items : [];
+  const payloadPageSize = Number(payload?.page_size) || recentRacesPageSize;
+  recentRacesPageSize = payloadPageSize;
+  recentRacesTotalItems = Number(payload?.total_items) || allItems.length;
+  recentRacesTotalPages = Number(payload?.total_pages) || Math.max(1, Math.ceil(recentRacesTotalItems / recentRacesPageSize));
+  recentRacesPage = Math.min(Number(payload?.page) || page, recentRacesTotalPages);
+  if (payload?.total_items == null && allItems.length > recentRacesPageSize) {
+    const start = (recentRacesPage - 1) * recentRacesPageSize;
+    recentRaceItems = allItems.slice(start, start + recentRacesPageSize);
+  } else {
+    recentRaceItems = allItems;
+  }
+  return recentRaceItems;
+}
+async function loadRecentRacesPageAndRender(page) {
+  const container = document.getElementById("recent-races-table");
+  if (container) container.innerHTML = `<div class="empty">${escapeHtml(t("loadingShort"))}</div>`;
+  try {
+    await loadRecentRacesPage(page);
+    renderRecentRaces(recentRaceItems);
+  } catch (error) {
+    console.error(error);
+    if (container) container.innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
+  }
+}
+function renderRecentRacesPagination(container) {
+  if (recentRacesTotalPages <= 1) return;
+  const start = recentRacesTotalItems ? ((recentRacesPage - 1) * recentRacesPageSize) + 1 : 0;
+  const end = Math.min(recentRacesPage * recentRacesPageSize, recentRacesTotalItems);
+  const buttons = [];
+  buttons.push(`<button class="race-page-btn" type="button" data-page="${recentRacesPage - 1}" ${recentRacesPage <= 1 ? "disabled" : ""} aria-label="Previous page">&lt;</button>`);
+  const first = Math.max(1, recentRacesPage - 2);
+  const last = Math.min(recentRacesTotalPages, recentRacesPage + 2);
+  for (let page = first; page <= last; page += 1) {
+    buttons.push(`<button class="race-page-btn ${page === recentRacesPage ? "active" : ""}" type="button" data-page="${page}" ${page === recentRacesPage ? "aria-current=\"page\"" : ""}>${page}</button>`);
+  }
+  buttons.push(`<button class="race-page-btn" type="button" data-page="${recentRacesPage + 1}" ${recentRacesPage >= recentRacesTotalPages ? "disabled" : ""} aria-label="Next page">&gt;</button>`);
+  container.insertAdjacentHTML("beforeend", `
+    <div class="race-pagination">
+      <div class="race-pagination-info">${escapeHtml(`${start}-${end} / ${recentRacesTotalItems}`)}</div>
+      <div class="race-pagination-buttons">${buttons.join("")}</div>
+    </div>
+  `);
+  container.querySelectorAll(".race-page-btn[data-page]").forEach(button => {
+    button.addEventListener("click", () => {
+      const page = Number(button.dataset.page);
+      if (!Number.isFinite(page) || page < 1 || page > recentRacesTotalPages || page === recentRacesPage) return;
+      loadRecentRacesPageAndRender(page);
+    });
+  });
 }
 function renderRaceResultsModal() {
   const titleEl = document.getElementById("race-results-title");
@@ -1546,13 +1630,13 @@ async function init() {
     const [announcement, schedule, recentRaces, serverStatus] = await Promise.all([
       loadJson(announcementUrl),
       loadJson(scheduleUrl),
-      loadJson(recentRacesUrl),
+      loadRecentRacesPage(1),
       loadJson(serverStatusUrl).catch(() => null)
     ]);
     announcementData = announcement || {};
     serverStatusData = serverStatus && typeof serverStatus === "object" ? serverStatus : null;
     scheduleItems = Array.isArray(schedule?.items) ? schedule.items : [];
-    recentRaceItems = Array.isArray(recentRaces?.items) ? recentRaces.items : [];
+    recentRaceItems = Array.isArray(recentRaces) ? recentRaces : [];
     await loadVotesForSchedule(scheduleItems.slice(0, 3));
     hasLoadError = false;
     renderUI();

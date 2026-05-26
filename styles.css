@@ -1219,6 +1219,50 @@ tbody tr:not(.is-interactive-row):hover {
   transform: none;
 }
 
+.race-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.race-pagination-info {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.race-pagination-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.race-page-btn {
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.race-page-btn:hover:not(:disabled),
+.race-page-btn.active {
+  border-color: rgba(255, 91, 46, 0.72);
+  background: rgba(255, 91, 46, 0.16);
+}
+
+.race-page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .races-table tbody tr {
   cursor: pointer;
   transition: background 0.18s ease, transform 0.18s ease;

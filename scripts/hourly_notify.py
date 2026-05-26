@@ -12,6 +12,8 @@ DEFAULT_ANNOUNCEMENT_URL = "https://data.asgracing.ru/hourly-data/announcement.j
 DEFAULT_SCHEDULE_URL = "https://data.asgracing.ru/hourly-data/schedule.json"
 DEFAULT_STATE_FILE = REPO_ROOT / ".github" / "hourly_notify_state.json"
 DEFAULT_TIMEOUT_SECONDS = 20
+DEFAULT_DELIVERY_TIMEOUT_SECONDS = 45
+DEFAULT_DELIVERY_ATTEMPTS = 2
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.ru"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
@@ -34,6 +36,42 @@ DEFAULT_EVENING_TRIGGER_HOUR_MSK = 18
 DEFAULT_TRIGGER_WINDOW_HOURS = 2
 TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID = None
 TELEGRAM_LAST_PINNED_MESSAGE_ID = None
+
+
+def configure_console_encoding():
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+def read_bool_env(name, default_value=False):
+    value = os.getenv(name)
+    if value is None:
+        return default_value
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def delivery_timeout_seconds():
+    return read_int_env("HOURLY_NOTIFY_DELIVERY_TIMEOUT_SECONDS", DEFAULT_DELIVERY_TIMEOUT_SECONDS)
+
+
+def delivery_attempts():
+    return max(1, read_int_env("HOURLY_NOTIFY_DELIVERY_ATTEMPTS", DEFAULT_DELIVERY_ATTEMPTS))
+
+
+def urlopen_delivery(req):
+    last_exc = None
+    for _ in range(delivery_attempts()):
+        try:
+            return request.urlopen(req, timeout=delivery_timeout_seconds())
+        except Exception as exc:
+            last_exc = exc
+    raise last_exc
 
 
 def normalize_event_id(value):
@@ -724,7 +762,7 @@ def pin_telegram_message(bot_token, chat_id, message_id):
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/pinChatMessage"
     req = request.Request(url, data=payload, method="POST")
-    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+    with urlopen_delivery(req) as response:
         response.read()
     TELEGRAM_LAST_PINNED_MESSAGE_ID = message_id
     return True
@@ -739,7 +777,7 @@ def unpin_telegram_message(bot_token, chat_id, message_id):
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/unpinChatMessage"
     req = request.Request(url, data=payload, method="POST")
-    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+    with urlopen_delivery(req) as response:
         response.read()
     return True
 
@@ -791,7 +829,7 @@ def send_telegram_message(message, item, details_url):
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     req = request.Request(url, data=payload, method="POST")
-    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+    with urlopen_delivery(req) as response:
         sent_payload = read_telegram_response(response)
     maybe_pin_telegram_message(bot_token, chat_id, sent_payload)
     return True
@@ -814,7 +852,7 @@ def send_telegram_photo(caption, image_url, item, details_url):
     ).encode("utf-8")
     url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
     req = request.Request(url, data=payload, method="POST")
-    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+    with urlopen_delivery(req) as response:
         sent_payload = read_telegram_response(response)
     maybe_pin_telegram_message(bot_token, chat_id, sent_payload)
     return True
@@ -847,7 +885,7 @@ def send_discord_message(payload):
         },
         method="POST",
     )
-    with request.urlopen(req, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+    with urlopen_delivery(req) as response:
         response.read()
     return True
 
@@ -1002,6 +1040,7 @@ def run():
 
 
 if __name__ == "__main__":
+    configure_console_encoding()
     try:
         run()
     except error.HTTPError as exc:

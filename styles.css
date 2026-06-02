@@ -1870,7 +1870,7 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .hero-server-card > .hero-server-grid-major {
-  grid-template-columns: minmax(1.15fr, 1.35fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .hero-server-grid {
@@ -1908,6 +1908,20 @@ tbody tr:not(.is-interactive-row):hover {
 .hero-server-item-emphasis .value {
   font-size: 0.86rem;
   line-height: 1.12;
+}
+
+.hero-server-card > .hero-server-grid-major .hero-server-item-emphasis {
+  min-height: 58px;
+  padding: 8px 10px;
+}
+
+.hero-server-card > .hero-server-grid-major .hero-server-item-emphasis .label {
+  font-size: 0.68rem;
+}
+
+.hero-server-card > .hero-server-grid-major .hero-server-item-emphasis .value {
+  font-size: 1.02rem;
+  line-height: 1.18;
 }
 
 .hero-server-grid-rules .hero-server-item {

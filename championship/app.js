@@ -100,6 +100,8 @@ const translations = {
 
 const TRACK_BACKGROUNDS = {
   monza: "../assets/tracks/monza.jpg",
+  monzatg: "../assets/tracks/monzaTG.jpg",
+  "monza-tg": "../assets/tracks/monzaTG.jpg",
   silverstone: "../assets/tracks/silverstone.jpg",
   spa: "../assets/tracks/spa.jpg",
   nurburgring: "../assets/tracks/nurburgring.jpg"
@@ -138,6 +140,17 @@ function getLocalizedField(item, key, fallback = "--") {
     if (typeof nested === "string" && nested.trim()) return nested;
   }
   return fallback;
+}
+
+function resolveTrackBackground(item) {
+  const directValue = item?.track_image || item?.track_photo || item?.background_image || item?.image;
+  if (directValue) {
+    const value = String(directValue).trim();
+    if (/^(https?:)?\/\//i.test(value) || value.startsWith("/") || value.startsWith("../")) return value;
+    return `../${value.replace(/^\.?\//, "")}`;
+  }
+  const trackCode = String(item?.track_code || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return TRACK_BACKGROUNDS[trackCode] || TRACK_BACKGROUNDS[trackCode.replace(/-/g, "")] || "";
 }
 
 function isChampionshipEvent(item) {
@@ -255,8 +268,7 @@ function renderUpcoming(items, standings) {
     return;
   }
   root.innerHTML = upcoming.map(item => {
-    const trackCode = String(item?.track_code || "").trim().toLowerCase();
-    const backgroundUrl = TRACK_BACKGROUNDS[trackCode];
+    const backgroundUrl = resolveTrackBackground(item);
     return `
       <article
         class="schedule-event-card is-championship-event"

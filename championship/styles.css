@@ -66,9 +66,20 @@
 }
 
 .championship-page .schedule-event-card-inner {
-  background: rgba(241, 245, 249, 0.16);
+  background: linear-gradient(135deg, rgba(12, 18, 28, 0.5), rgba(12, 18, 28, 0.28));
   border-color: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(7px);
+}
+
+.championship-page .championship-upcoming .schedule-event-card {
+  background:
+    linear-gradient(118deg, rgba(7, 11, 16, 0.22) 0%, rgba(7, 11, 16, 0.12) 42%, rgba(7, 11, 16, 0.26) 100%),
+    radial-gradient(circle at top right, rgba(168, 85, 247, 0.2), transparent 34%),
+    var(--schedule-track-photo),
+    rgba(22, 31, 43, 0.72);
+  background-position: center, top right, center, center;
+  background-size: cover, auto, cover, cover;
+  background-repeat: no-repeat;
 }
 
 .championship-standings-table th,

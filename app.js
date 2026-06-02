@@ -949,7 +949,7 @@ function buildSlotEventId(item) {
   const explicitId = canonicalizeSlotEventId(item?.event_id);
   if (explicitId) return explicitId;
   const date = String(item?.date || "").trim();
-  const time = String(item?.start_time_local || "").trim().replace(":", "");
+  const time = String(item?.start_time_local || "").trim().replace(/[^0-9]/g, "");
   if (!date || !time) return "";
   return normalizeEventId(`hourly_${date}_${time}`);
 }

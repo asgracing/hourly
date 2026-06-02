@@ -413,6 +413,7 @@ let selectedScheduleItem = null;
 let selectedRace = null;
 let hasLoadError = false;
 let votesEnabled = Boolean(votesApiBase);
+let votesLoaded = false;
 let voteStateByEventId = {};
 const raceDetailsCache = new Map();
 const HERO_TRACK_BACKGROUNDS = {
@@ -971,6 +972,7 @@ function getVoteState(item) {
 async function loadVotesForSchedule(items) {
   if (!votesApiBase) {
     votesEnabled = false;
+    votesLoaded = false;
     voteStateByEventId = {};
     return;
   }
@@ -984,13 +986,13 @@ async function loadVotesForSchedule(items) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     if (payload?.items && typeof payload.items === "object") {
-      voteStateByEventId = payload.items;
+      voteStateByEventId = { ...voteStateByEventId, ...payload.items };
       votesEnabled = true;
+      votesLoaded = true;
     }
   } catch (error) {
     console.error(error);
-    votesEnabled = false;
-    voteStateByEventId = {};
+    votesEnabled = Boolean(votesApiBase);
   }
 }
 async function submitVote(item) {
@@ -1044,6 +1046,8 @@ async function submitUnvote(item) {
       headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify({
         event_id: eventId,
+        date: item?.date || "",
+        time: item?.start_time_local || "",
         voter_id: getBrowserVoterId()
       })
     });
@@ -1081,7 +1085,7 @@ function buildVoteControls(item, context = "card") {
     ? t("voteFailed")
     : voteState.pending
       ? t("voteSending")
-      : votesEnabled
+      : votesLoaded || voteStateByEventId[voteState.eventId]
         ? getVoteLabel(voteState.votes)
         : t("voteSoon");
   const baseClass = context === "hero" ? "hero-vote" : "schedule-event-vote";
@@ -1092,7 +1096,7 @@ function buildVoteControls(item, context = "card") {
           class="${baseClass}-btn${voteState.already_voted ? " is-voted" : ""}"
           type="button"
           data-vote-event-id="${escapeHtml(voteState.eventId)}"
-          ${(!votesEnabled || voteState.already_voted || voteState.pending) ? "disabled" : ""}
+          ${(!votesApiBase || voteState.already_voted || voteState.pending) ? "disabled" : ""}
         >
           <span>${escapeHtml(voteState.already_voted ? t("voteButtonDone") : t("voteButton"))}</span>
           <span class="${baseClass}-icon" aria-hidden="true">♥</span>
@@ -1806,7 +1810,9 @@ function bindTopNavMoreMenu() {
 
     hiddenItems.forEach(item => {
       const clone = item.cloneNode(true);
-      clone.className = "top-nav-more-link";
+      clone.className = item.classList.contains("top-nav-link-championship")
+        ? "top-nav-more-link top-nav-more-link-championship"
+        : "top-nav-more-link";
       clone.hidden = false;
       clone.removeAttribute("data-nav-item");
       menu.appendChild(clone);

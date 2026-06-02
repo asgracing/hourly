@@ -142,6 +142,33 @@ body {
   justify-content: flex-end;
 }
 
+body.championship-body .top-nav-inner {
+  grid-template-columns: auto auto auto;
+  grid-template-areas:
+    "brand socials actions"
+    "menu menu menu";
+  justify-content: center;
+}
+
+body.championship-body .top-nav-brand {
+  justify-self: start;
+}
+
+body.championship-body .top-nav-socials {
+  justify-self: center;
+}
+
+body.championship-body .top-nav-center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+body.championship-body .top-nav-menu {
+  width: auto;
+  justify-content: center;
+}
+
 .top-nav-more {
   position: relative;
   display: none;
@@ -2292,6 +2319,30 @@ body.modal-open {
     padding: 10px;
     font-size: 0.84rem;
   }
+
+  body.championship-body .top-nav-inner {
+    grid-template-columns: auto auto auto;
+    grid-template-areas:
+      "brand socials actions"
+      "menu menu menu";
+    justify-content: center;
+  }
+
+  body.championship-body .top-nav-socials {
+    display: flex;
+  }
+
+  body.championship-body .top-nav-center {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  body.championship-body .top-nav-menu {
+    width: auto;
+    justify-content: center;
+    padding: 2px 0 0;
+  }
 }
 
 @media (max-width: 1420px) and (min-width: 721px) {
@@ -2386,6 +2437,23 @@ body.modal-open {
     min-height: 44px;
     padding: 10px;
     font-size: 0.84rem;
+  }
+
+  body.championship-body .top-nav-inner {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "brand socials actions"
+      "menu menu menu";
+    justify-content: stretch;
+  }
+
+  body.championship-body .top-nav-center {
+    display: block;
+  }
+
+  body.championship-body .top-nav-menu {
+    width: 100%;
+    justify-content: flex-start;
   }
 
 }

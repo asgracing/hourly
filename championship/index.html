@@ -7,9 +7,9 @@
   <meta name="description" content="ASG Racing active hourly championship progress, upcoming races and standings." />
   <meta name="robots" content="index, follow" />
   <meta name="theme-color" content="#0b0f14" />
-  <link rel="canonical" href="https://asgracing.github.io/hourly/championship/" />
-  <link rel="stylesheet" href="../styles.css?v=20260602championship2" />
-  <link rel="stylesheet" href="./styles.css?v=20260602championship2" />
+  <link rel="canonical" href="https://asgracing.ru/hourly/championship/" />
+  <link rel="stylesheet" href="../styles.css?v=20260602championship3" />
+  <link rel="stylesheet" href="./styles.css?v=20260602championship3" />
 </head>
 <body id="top">
   <nav class="top-nav" id="top-nav">
@@ -25,10 +25,10 @@
       </div>
       <div class="top-nav-center">
         <div class="top-nav-menu">
-          <a class="top-nav-link-secondary" href="../">Hourly Race</a>
-          <a class="top-nav-link-secondary is-current championship-nav-link" href="./">Championship</a>
-          <a class="top-nav-link-secondary" href="../#schedule">Events</a>
-          <a class="top-nav-link-secondary" href="../#recent-races">Results</a>
+          <a class="top-nav-link-secondary" href="../" data-i18n="navHourly">Hourly Race</a>
+          <a class="top-nav-link-secondary is-current championship-nav-link" href="./" data-i18n="navChampionship">Championship</a>
+          <a class="top-nav-link-secondary" href="#championship-standings-section" data-i18n="navStandings">Standings</a>
+          <a class="top-nav-link-secondary" href="#championship-race-results-section" data-i18n="navPastRaces">Past races</a>
         </div>
       </div>
       <div class="top-nav-actions">
@@ -53,26 +53,51 @@
     <section class="card championship-section">
       <div class="section-head">
         <div>
-          <div class="eyebrow">Upcoming</div>
-          <h2>Upcoming races</h2>
+          <div class="eyebrow" id="championship-upcoming-eyebrow">Upcoming</div>
+          <h2 id="championship-upcoming-title">Upcoming races</h2>
         </div>
       </div>
       <div id="championship-upcoming" class="schedule-cards-grid"></div>
     </section>
 
-    <section class="card championship-section">
+    <section class="card championship-section" id="championship-prizes-section">
       <div class="section-head">
         <div>
-          <div class="eyebrow">Standings</div>
-          <h2>Championship results</h2>
+          <div class="eyebrow" data-i18n="prizesEyebrow">Prizes</div>
+          <h2 data-i18n="prizesTitle">Rewards</h2>
+        </div>
+      </div>
+      <div id="championship-prizes-grid" class="championship-prizes-grid"></div>
+    </section>
+
+    <section class="card championship-section" id="championship-standings-section">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow" data-i18n="standingsEyebrow">Standings</div>
+          <h2 data-i18n="standingsTitle">Championship results</h2>
         </div>
       </div>
       <div class="table-card table-card-compact">
         <div class="table-wrap" id="championship-standings"></div>
       </div>
     </section>
+
+    <section class="card championship-section" id="championship-race-results-section">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow" data-i18n="raceResultsEyebrow">Archive</div>
+          <h2 data-i18n="raceResultsTitle">Championship race results</h2>
+        </div>
+      </div>
+      <div id="championship-race-results" class="championship-race-results"></div>
+    </section>
+
+    <div class="championship-lightbox" id="championship-lightbox" aria-hidden="true">
+      <button class="championship-lightbox-close" id="championship-lightbox-close" type="button" aria-label="Close">x</button>
+      <img id="championship-lightbox-image" src="" alt="" />
+    </div>
   </main>
 
-  <script src="./app.js?v=20260602championship2" defer></script>
+  <script src="./app.js?v=20260602championship3" defer></script>
 </body>
 </html>

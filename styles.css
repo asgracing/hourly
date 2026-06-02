@@ -911,16 +911,16 @@ h2 {
 
 .championship-summary {
   display: grid;
-  gap: 12px;
+  gap: 9px;
   height: 100%;
-  align-content: center;
+  align-content: start;
 }
 
 .championship-summary-title {
   color: #f5edff;
-  font-size: clamp(1.55rem, 3vw, 2.35rem);
+  font-size: clamp(1.2rem, 2vw, 1.75rem);
   font-weight: 950;
-  line-height: 1;
+  line-height: 1.05;
 }
 
 .championship-summary-meta {
@@ -932,7 +932,33 @@ h2 {
 .championship-summary-text {
   color: #d9ccef;
   font-weight: 650;
-  line-height: 1.45;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.championship-next-card {
+  display: grid;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid rgba(193, 132, 252, 0.34);
+  border-radius: 15px;
+  background:
+    linear-gradient(135deg, rgba(126, 34, 206, 0.16), rgba(255, 209, 102, 0.05)),
+    rgba(8, 12, 18, 0.54);
+}
+
+.championship-next-track {
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 950;
+  line-height: 1.08;
+}
+
+.championship-next-detail {
+  color: #dce8f7;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 .championship-summary-btn {
@@ -1805,6 +1831,92 @@ tbody tr:not(.is-interactive-row):hover {
   color: #ffe5ae;
   font-weight: 900;
   text-decoration: none;
+}
+
+.hero-server-card {
+  gap: 6px;
+  padding: 5px;
+}
+
+.hero-server-grid {
+  gap: 6px;
+}
+
+.hero-server-stack {
+  gap: 6px;
+}
+
+.hero-server-grid-rules {
+  gap: 6px;
+}
+
+.hero-server-item {
+  padding: 7px 8px;
+  border-radius: 13px;
+  gap: 7px;
+}
+
+.hero-server-item .label {
+  font-size: 0.68rem;
+}
+
+.hero-server-item .value {
+  font-size: 0.82rem;
+  line-height: 1.22;
+}
+
+.hero-server-item-emphasis .label {
+  margin-bottom: 2px;
+}
+
+.hero-server-item-emphasis .value {
+  font-size: 0.98rem;
+  line-height: 1.18;
+}
+
+.hero-server-grid-rules .hero-server-item {
+  gap: 5px;
+}
+
+.hero-token-list {
+  gap: 4px;
+}
+
+.hero-token {
+  min-height: 22px;
+  padding: 3px 6px;
+  font-size: 0.68rem;
+}
+
+.hero-token-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.hero-copy-row {
+  gap: 6px;
+}
+
+.hero-copy-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.hero-connect-actions {
+  gap: 6px;
+}
+
+.hero-connect-btn,
+.hero-connect-help {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+.hero-announcement-card {
+  gap: 9px;
+  padding: 10px;
 }
 
 #schedule-modal .schedule-modal-vote .hero-vote {

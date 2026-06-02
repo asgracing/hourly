@@ -1240,12 +1240,21 @@ function renderHeroDetails(data) {
 function renderChampionshipHero(data) {
   const titleEl = document.getElementById("hero-championship-title");
   const metaEl = document.getElementById("hero-championship-meta");
+  const badgeEl = document.getElementById("hero-championship-badge");
+  const trackEl = document.getElementById("hero-championship-track");
+  const dateEl = document.getElementById("hero-championship-date");
+  const weatherEl = document.getElementById("hero-championship-weather");
   const descriptionEl = document.getElementById("hero-championship-description");
   const buttonEl = document.querySelector(".championship-summary-btn");
   const championship = data?.championship || {};
-  const title = data?.championship_title || championship.title || t("championshipBadge");
+  const nextChampionship = scheduleItems.find(isChampionshipEvent) || (isChampionshipEvent(data) ? data : null);
+  const title = data?.championship_title || championship.title || nextChampionship?.championship_title || t("championshipBadge");
   if (titleEl) titleEl.textContent = title;
-  if (metaEl) metaEl.textContent = [championship.period, championship.status].filter(Boolean).join(" · ") || eventBadgeLabel(data);
+  if (metaEl) metaEl.textContent = [championship.period, championship.status].filter(Boolean).join(" · ") || eventBadgeLabel(nextChampionship || data);
+  if (badgeEl) badgeEl.textContent = nextChampionship ? eventBadgeLabel(nextChampionship) : t("championshipBadge");
+  if (trackEl) trackEl.textContent = nextChampionship ? getLocalizedField(nextChampionship, "track_name", nextChampionship.track_code || "--") : t("unknownValue");
+  if (dateEl) dateEl.textContent = nextChampionship ? formatScheduleDateTime(nextChampionship) : t("unknownValue");
+  if (weatherEl) weatherEl.textContent = nextChampionship ? buildScheduleCardWeather(nextChampionship) : t("unknownValue");
   if (descriptionEl) descriptionEl.textContent = championship.description || t("championshipNoDescription");
   if (buttonEl) buttonEl.textContent = title;
 }

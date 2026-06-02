@@ -50,7 +50,7 @@
   <meta name="twitter:image:alt" content="ASG Racing hourly race preview" />
   <meta name="hourly-votes-api" content="https://hourly-votes.asgracing.workers.dev" />
 
-  <link rel="stylesheet" href="./styles.css?v=20260526vps3" />
+  <link rel="stylesheet" href="./styles.css?v=20260602calendar2" />
   <link rel="stylesheet" href="./legal.css" />
 </head>
 <body id="top">
@@ -231,6 +231,13 @@
           <div class="empty" data-i18n="loadingShort">Loading...</div>
         </div>
       </div>
+      <details class="calendar-panel" id="calendar-panel">
+        <summary>
+          <span data-i18n="calendarSummary">Full event calendar</span>
+          <span class="calendar-panel-count" id="calendar-count">--</span>
+        </summary>
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </details>
     </section>
 
     <section class="card" id="recent-races">
@@ -297,6 +304,6 @@
   </main>
 
   <script src="./legal.js" defer></script>
-  <script src="./app.js?v=20260526perf1" defer></script>
+  <script src="./app.js?v=20260602calendar2" defer></script>
 </body>
 </html>

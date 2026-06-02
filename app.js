@@ -140,6 +140,11 @@ const translations = {
     scheduleModalDateTime: "Date & time",
     scheduleModalSlot: "Slot",
     scheduleModalRain: "Rain forecast",
+    calendarSummary: "Full event calendar",
+    calendarEmpty: "No calendar events yet.",
+    championshipBadge: "Championship Event",
+    hourlyBadge: "Hourly Race",
+    votingDisabledChampionship: "Voting is disabled for championship events",
     voteButton: "I want to race!",
     voteButtonDone: "You're in",
     voteCountZero: "No votes yet",
@@ -332,7 +337,12 @@ Object.assign(translations.ru, {
   scheduleModalEyebrow: "Детали слота",
   scheduleModalDateTime: "Дата и время",
   scheduleModalSlot: "Слот",
-  scheduleModalRain: "Прогноз дождя"
+  scheduleModalRain: "Прогноз дождя",
+  calendarSummary: "Полный календарь событий",
+  calendarEmpty: "Пока нет событий в календаре.",
+  championshipBadge: "Событие чемпионата",
+  hourlyBadge: "Часовая гонка",
+  votingDisabledChampionship: "Голосование для событий чемпионата отключено"
 });
 
 Object.assign(translations.ru, {
@@ -378,6 +388,16 @@ function buildScheduleItems(schedule, announcement) {
       rain_level: announcement.weather?.rain_level
     }
   ];
+}
+function isChampionshipEvent(item) {
+  return String(item?.event_type || item?.type || "").trim().toLowerCase() === "championship";
+}
+function isVotingDisabledForItem(item) {
+  return Boolean(item?.voting_disabled) || isChampionshipEvent(item);
+}
+function eventBadgeLabel(item) {
+  if (item?.badge_label) return getLocalizedField(item, "badge_label", item.badge_label);
+  return isChampionshipEvent(item) ? t("championshipBadge") : t("hourlyBadge");
 }
 let recentRacesPage = 1;
 let recentRacesPageSize = 10;
@@ -773,11 +793,12 @@ function buildScheduleModalDetails(item) {
   const session = announcementData?.session || {};
   const rules = announcementData?.rules || {};
   const weather = item?.weather || announcementData?.weather || {};
+  const detailsUrl = item?.details_url ? String(item.details_url) : "";
   return `
     <div class="schedule-modal-hero">
       <div class="schedule-modal-vote">
         ${buildVoteControls(item, "hero")}
-        <div class="legal-inline-note">${buildCompactVoteLegalNoteHtml()}</div>
+        ${isVotingDisabledForItem(item) ? "" : `<div class="legal-inline-note">${buildCompactVoteLegalNoteHtml()}</div>`}
       </div>
 
       <section class="hero-server-card schedule-modal-hero-pane">
@@ -812,6 +833,11 @@ function buildScheduleModalDetails(item) {
           <div class="value">${renderHeroTokenGroups(buildWeatherTokenGroups(weather))}</div>
         </div>
       </aside>
+      ${
+        detailsUrl
+          ? `<a class="event-details-link" href="${escapeHtml(detailsUrl)}">${escapeHtml(eventBadgeLabel(item))}</a>`
+          : ""
+      }
     </div>
   `;
 }
@@ -834,6 +860,42 @@ function formatDate(isoDate) {
   const date = new Date(`${isoDate}T00:00:00+03:00`);
   if (Number.isNaN(date.getTime())) return isoDate;
   return new Intl.DateTimeFormat(t("locale"), { day: "2-digit", month: "long", year: "numeric", timeZone: "Europe/Moscow" }).format(date);
+}
+function parseIsoDateParts(isoDate) {
+  const match = String(isoDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3])
+  };
+}
+function getMoscowDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Europe/Moscow"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day)
+  };
+}
+function formatCalendarMonthLabel(year, month) {
+  return new Intl.DateTimeFormat(t("locale"), {
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Moscow"
+  }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
+}
+function getCalendarWeekdayNames() {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(Date.UTC(2026, 0, 5 + index, 12));
+    return new Intl.DateTimeFormat(t("locale"), { weekday: "short", timeZone: "Europe/Moscow" }).format(date);
+  });
 }
 function formatDateTimeLocal(isoString) {
   if (!isoString) return "--";
@@ -906,7 +968,7 @@ async function loadVotesForSchedule(items) {
     voteStateByEventId = {};
     return;
   }
-  const eventIds = items.map(buildSlotEventId).filter(Boolean);
+  const eventIds = items.filter(item => !isVotingDisabledForItem(item)).map(buildSlotEventId).filter(Boolean);
   if (!eventIds.length) return;
   try {
     const url = new URL("/votes", votesApiBase);
@@ -1000,6 +1062,14 @@ async function submitUnvote(item) {
   }
 }
 function buildVoteControls(item, context = "card") {
+  if (isVotingDisabledForItem(item)) {
+    const baseClass = context === "hero" ? "hero-vote" : "schedule-event-vote";
+    return `
+      <div class="${baseClass} ${baseClass}-locked">
+        <div class="${baseClass}-meta">${escapeHtml(t("votingDisabledChampionship"))}</div>
+      </div>
+    `;
+  }
   const voteState = getVoteState(item);
   const voteCountLabel = voteState.failed
     ? t("voteFailed")
@@ -1189,7 +1259,7 @@ function renderScheduleTable(rows) {
     const backgroundUrl = HERO_TRACK_BACKGROUNDS[trackCode];
     return `
       <article
-        class="schedule-event-card is-interactive-row"
+        class="schedule-event-card is-interactive-row${isChampionshipEvent(row) ? " is-championship-event" : ""}"
         data-schedule-index="${index}"
         tabindex="0"
         role="button"
@@ -1197,6 +1267,7 @@ function renderScheduleTable(rows) {
         style="--schedule-track-photo: ${backgroundUrl ? `url('${escapeHtml(backgroundUrl)}')` : "none"};"
       >
         <div class="schedule-event-card-inner">
+          <div class="event-type-badge">${escapeHtml(eventBadgeLabel(row))}</div>
           <div class="schedule-event-time">${escapeHtml(formatScheduleCardDateTime(row))}</div>
           <div class="schedule-event-track">${escapeHtml(getLocalizedField(row, "track_name", row.track_name || "--"))}</div>
           <div class="schedule-event-weather"><span>${escapeHtml(buildScheduleCardWeather(row))}</span><img src="./assets/weather/rain.png" alt="" /></div>
@@ -1212,6 +1283,64 @@ function renderScheduleTable(rows) {
     card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCard(); } });
   });
   bindVoteControls(container);
+}
+function renderCalendar(rows) {
+  const grid = document.getElementById("calendar-grid");
+  const count = document.getElementById("calendar-count");
+  if (!grid) return;
+  const items = Array.isArray(rows) ? rows : [];
+  const today = getMoscowDateParts();
+  const currentMonthItems = items
+    .map((row, index) => ({ row, index, dateParts: parseIsoDateParts(row?.date) }))
+    .filter(item =>
+      item.dateParts &&
+      item.dateParts.year === today.year &&
+      item.dateParts.month === today.month &&
+      item.dateParts.day >= today.day
+    );
+  const itemsByDay = new Map();
+  currentMonthItems.forEach(item => {
+    if (!itemsByDay.has(item.dateParts.day)) itemsByDay.set(item.dateParts.day, []);
+    itemsByDay.get(item.dateParts.day).push(item);
+  });
+  const monthLabel = formatCalendarMonthLabel(today.year, today.month);
+  if (count) count.textContent = currentMonthItems.length ? `${monthLabel} · ${currentMonthItems.length}` : monthLabel;
+  const daysInMonth = new Date(Date.UTC(today.year, today.month, 0, 12)).getUTCDate();
+  const firstDayIndex = (new Date(Date.UTC(today.year, today.month - 1, 1, 12)).getUTCDay() + 6) % 7;
+  const weekdayHeaders = getCalendarWeekdayNames()
+    .map(dayName => `<div class="calendar-weekday">${escapeHtml(dayName)}</div>`)
+    .join("");
+  const leadingBlanks = Array.from({ length: firstDayIndex }, () => `<div class="calendar-day calendar-day-empty" aria-hidden="true"></div>`);
+  const dayCells = Array.from({ length: daysInMonth }, (_, dayIndex) => {
+    const day = dayIndex + 1;
+    const dayEvents = itemsByDay.get(day) || [];
+    const eventsHtml = dayEvents.map(({ row, index }) => {
+      const trackCode = String(row?.track_code || "").trim().toLowerCase();
+      const backgroundUrl = HERO_TRACK_BACKGROUNDS[trackCode];
+      return `
+        <button
+          class="calendar-event${isChampionshipEvent(row) ? " is-championship-event" : ""}"
+          type="button"
+          data-calendar-index="${index}"
+          style="--calendar-track-photo: ${backgroundUrl ? `url('${escapeHtml(backgroundUrl)}')` : "none"};"
+        >
+          <span class="calendar-event-time">${escapeHtml(row?.start_time_local || "--")}</span>
+          <span class="calendar-event-track">${escapeHtml(getLocalizedField(row, "track_name", row?.track_name || row?.track_code || "--"))}</span>
+          <span class="event-type-badge">${escapeHtml(eventBadgeLabel(row))}</span>
+        </button>
+      `;
+    }).join("");
+    return `
+      <div class="calendar-day${day < today.day ? " is-past" : ""}">
+        <div class="calendar-day-number">${escapeHtml(day)}</div>
+        <div class="calendar-day-events">${eventsHtml}</div>
+      </div>
+    `;
+  });
+  grid.innerHTML = `${weekdayHeaders}${leadingBlanks.join("")}${dayCells.join("")}`;
+  grid.querySelectorAll("[data-calendar-index]").forEach(button => {
+    button.addEventListener("click", () => openScheduleModal(scheduleItems[Number(button.dataset.calendarIndex)] || null));
+  });
 }
 function renderRecentRaces(rows) {
   const container = document.getElementById("recent-races-table");
@@ -1539,6 +1668,7 @@ function renderUI() {
   renderHeroDetails(announcementData || {});
   renderHeroVote();
   renderScheduleTable(scheduleItems);
+  renderCalendar(scheduleItems);
   renderRecentRaces(recentRaceItems);
   renderScheduleModal();
   renderRaceResultsModal();

@@ -15,24 +15,56 @@ import hourly_planning as planning
 
 APP_ROOT_DIR = Path(__file__).resolve().parents[1]
 SERVER_ROOT_DIR = APP_ROOT_DIR.parent
-DATA_ROOT_DIR = SERVER_ROOT_DIR / "hourly-data"
+
+
+def resolve_data_root_dir() -> Path:
+    for env_key in ("HOURLY_DATA_DIR", "ACC_HOURLY_DATA_DIR", "ACC_LEGACY_HOURLY_DATA_DIR"):
+        value = os.getenv(env_key, "").strip()
+        if value:
+            return Path(value).expanduser()
+    candidates = [
+        SERVER_ROOT_DIR / "hourly-data",
+        SERVER_ROOT_DIR / "server" / "hourly-data",
+        APP_ROOT_DIR.parent / "server" / "hourly-data",
+    ]
+    for candidate in candidates:
+        if (candidate / "config" / "schedule_config.json").exists():
+            return candidate
+    return SERVER_ROOT_DIR / "hourly-data"
+
+
+DATA_ROOT_DIR = resolve_data_root_dir()
 CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 ROTATION_STATE_PATH = CONFIG_DIR / "rotation_state.json"
 RUNTIME_STATE_PATH = CONFIG_DIR / "runtime_state.json"
 SCHEDULE_PATH = DATA_ROOT_DIR / "schedule.json"
+CALENDAR_PATH = DATA_ROOT_DIR / "calendar.json"
 ANNOUNCEMENT_PATH = DATA_ROOT_DIR / "announcement.json"
 RECENT_RACES_PATH = DATA_ROOT_DIR / "recent_races.json"
 RACES_DIR = DATA_ROOT_DIR / "races"
 RACES_INDEX_PATH = RACES_DIR / "races.json"
+EVENTS_DIR = DATA_ROOT_DIR / "events"
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 SCHEDULE_LOOKAHEAD_SLOTS = 3
 RECENT_RACES_LIMIT = 12
 INVALID_LAP_VALUES = {0, -1, 2147483647, 4294967295}
+STANDARD_POINTS_MAP = {
+    1: 25,
+    2: 18,
+    3: 15,
+    4: 12,
+    5: 10,
+    6: 8,
+    7: 6,
+    8: 4,
+    9: 2,
+    10: 1,
+}
 HOURLY_POINTS_MAP = {position: 26 - position for position in range(1, 26)}
 BEST_LAP_BONUS = 1
 HOURLY_POINTS_MULTIPLIER = 5
-SCORING_BASE_MAX_POINTS = HOURLY_POINTS_MAP[1]
+SCORING_BASE_MAX_POINTS = STANDARD_POINTS_MAP[1]
 CAR_MODEL_NAMES = {
     0: "Porsche 991 GT3 R", 1: "Mercedes-AMG GT3", 2: "Ferrari 488 GT3", 3: "Audi R8 LMS",
     4: "Lamborghini Huracan GT3", 5: "McLaren 650S GT3", 6: "Nissan GT-R Nismo GT3 2018",
@@ -93,8 +125,8 @@ def calculate_scaled_points(base_points, participant_count: int):
     return normalize_points_value(base_points * scale)
 
 
-def calculate_race_points(position: int, participant_count: int, has_best_lap: bool = False):
-    points = calculate_scaled_points(HOURLY_POINTS_MAP.get(position, 0), participant_count)
+def calculate_race_points(position: int, participant_count: int, points_map: dict | None = None, has_best_lap: bool = False):
+    points = calculate_scaled_points((points_map or HOURLY_POINTS_MAP).get(position, 0), participant_count)
     if has_best_lap:
         points = normalize_points_value(points + BEST_LAP_BONUS)
     return points
@@ -156,6 +188,21 @@ def resolve_results_dir_path(schedule_config: dict) -> Path:
     if results_dir.is_absolute():
         return results_dir
     return server_root / results_dir
+
+
+def resolve_championship_results_root_path(schedule_config: dict) -> Path:
+    championship = schedule_config.get("championship") or {}
+    server_root = resolve_server_root_path(schedule_config)
+    configured = (
+        championship.get("results_root")
+        or schedule_config.get("championship_results_root")
+        or schedule_config.get("champ_results_root")
+        or "results_champ"
+    )
+    path = Path(configured)
+    if path.is_absolute():
+        return path
+    return server_root / path
 
 
 def resolve_server_path(schedule_config: dict, configured_path: str | None, default_relative_path: str) -> Path:
@@ -769,7 +816,14 @@ def format_local_time(value):
     return value[:16]
 
 
-def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
+def build_race_detail(
+    path: Path,
+    data: dict,
+    qualifying_snapshot: dict,
+    points_map: dict | None = None,
+    points_multiplier: int = HOURLY_POINTS_MULTIPLIER,
+    points_rule: str = "scaled_25_to_1_by_classified_x5_all_participants",
+):
     lines = (((data or {}).get("sessionResult") or {}).get("leaderBoardLines") or [])
     if not isinstance(lines, list) or not lines:
         return None
@@ -809,8 +863,8 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
         positions_delta = start_position - position if isinstance(start_position, int) else None
         had_best_lap = best_lap_driver_id == item["player_id"]
         points = apply_points_multiplier(
-            calculate_race_points(position, scoring_participants_count, had_best_lap),
-            HOURLY_POINTS_MULTIPLIER,
+            calculate_race_points(position, scoring_participants_count, points_map or HOURLY_POINTS_MAP, had_best_lap),
+            points_multiplier,
         )
         if position == 1:
             winner_name = item["display_name"]
@@ -872,8 +926,8 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
         "meta_data": data.get("metaData"),
         "participants_count": len(participants),
         "scoring_participants_count": scoring_participants_count,
-        "points_multiplier": HOURLY_POINTS_MULTIPLIER,
-        "points_rule": "scaled_25_to_1_by_classified_x5_all_participants",
+        "points_multiplier": points_multiplier,
+        "points_rule": points_rule,
         "winner": winner_name,
         "winner_public_id": winner_public_id,
         "best_lap": race_best_lap,
@@ -885,7 +939,13 @@ def build_race_detail(path: Path, data: dict, qualifying_snapshot: dict):
     }
 
 
-def build_recent_races(results_dir_path: Path):
+def build_recent_races(
+    results_dir_path: Path,
+    limit: int = RECENT_RACES_LIMIT,
+    points_map: dict | None = None,
+    points_multiplier: int = HOURLY_POINTS_MULTIPLIER,
+    points_rule: str = "scaled_25_to_1_by_classified_x5_all_participants",
+):
     if not results_dir_path.exists():
         empty_payload = {"items": [], "updated_at": now_local_iso()}
         return empty_payload, empty_payload
@@ -901,11 +961,18 @@ def build_recent_races(results_dir_path: Path):
             continue
         if not suffix.endswith("_R"):
             continue
-        race_detail = build_race_detail(path, data, pop_qualifying_snapshot(qualifying_snapshots, data))
+        race_detail = build_race_detail(
+            path,
+            data,
+            pop_qualifying_snapshot(qualifying_snapshots, data),
+            points_map=points_map or HOURLY_POINTS_MAP,
+            points_multiplier=points_multiplier,
+            points_rule=points_rule,
+        )
         if race_detail:
             race_details.append(race_detail)
     race_details.sort(key=lambda item: item.get("finished_at") or "", reverse=True)
-    race_details = race_details[:RECENT_RACES_LIMIT]
+    race_details = race_details[:limit]
     race_summaries = []
     for detail in race_details:
         race_summaries.append(
@@ -936,6 +1003,104 @@ def build_recent_races(results_dir_path: Path):
     return summary_payload, details_payload
 
 
+def active_championship_config(schedule_config: dict):
+    championship = schedule_config.get("championship")
+    if not isinstance(championship, dict):
+        return None
+    slug = str(championship.get("active_slug") or championship.get("slug") or "").strip()
+    if not slug:
+        return None
+    configs = championship.get("items") or championship.get("championships") or []
+    selected = next((item for item in configs if isinstance(item, dict) and item.get("slug") == slug), None)
+    if not isinstance(selected, dict):
+        selected = {}
+    payload = {**selected, **{key: value for key, value in championship.items() if key not in {"items", "championships"}}}
+    payload["slug"] = slug
+    payload["status"] = payload.get("status") or "active"
+    return payload
+
+
+def build_championship_standings(race_details: list[dict]):
+    races = sorted(race_details, key=lambda item: item.get("finished_at") or item.get("date") or "")
+    drivers = {}
+    for race_index, race in enumerate(races, start=1):
+        race_key = race.get("event_id") or f"race_{race_index}"
+        for result in race.get("results") or []:
+            public_id = result.get("public_id")
+            if not public_id:
+                continue
+            entry = drivers.setdefault(public_id, {
+                "public_id": public_id,
+                "driver": result.get("driver"),
+                "races": 0,
+                "wins": 0,
+                "podiums": 0,
+                "best_laps": 0,
+                "points": 0,
+                "race_points": {},
+            })
+            points = result.get("points") or 0
+            entry["driver"] = entry.get("driver") or result.get("driver")
+            entry["races"] += 1
+            entry["points"] += points
+            entry["race_points"][race_key] = points
+            if result.get("position") == 1:
+                entry["wins"] += 1
+            if isinstance(result.get("position"), int) and result["position"] <= 3:
+                entry["podiums"] += 1
+            if result.get("had_best_lap"):
+                entry["best_laps"] += 1
+    standings = sorted(drivers.values(), key=lambda item: (-item["points"], -item["wins"], -item["podiums"], item["driver"] or ""))
+    for rank, item in enumerate(standings, start=1):
+        item["rank"] = rank
+    return standings
+
+
+def publish_active_championship(schedule_config: dict):
+    championship = active_championship_config(schedule_config)
+    if not championship:
+        return None
+    slug = championship["slug"]
+    results_dir = resolve_championship_results_root_path(schedule_config) / slug
+    summary, details = build_recent_races(
+        results_dir,
+        limit=100,
+        points_map=STANDARD_POINTS_MAP,
+        points_multiplier=1,
+        points_rule="scaled_top10_by_classified_plus_best_lap",
+    )
+    race_details = details.get("items") or []
+    payload = {
+        "slug": slug,
+        "title": championship.get("title") or slug.replace("-", " ").title(),
+        "status": championship.get("status") or "active",
+        "period": championship.get("period"),
+        "description": championship.get("description") or "",
+        "prizes": championship.get("prizes") or {
+            "prize1": championship.get("prize1"),
+            "prize2": championship.get("prize2"),
+            "prize3": championship.get("prize3"),
+        },
+        "results_top3": build_championship_standings(race_details)[:3],
+        "standings": build_championship_standings(race_details),
+        "races": summary.get("items") or [],
+        "updated_at": now_local_iso(),
+    }
+    event_dir = EVENTS_DIR / slug
+    save_json(event_dir / "index.json", payload)
+    races_dir = event_dir / "races"
+    races_dir.mkdir(parents=True, exist_ok=True)
+    expected = set()
+    for detail in race_details:
+        filename = f"{detail['event_id']}.json"
+        save_json(races_dir / filename, detail)
+        expected.add(filename)
+    for path in races_dir.glob("*.json"):
+        if path.name not in expected:
+            path.unlink(missing_ok=True)
+    return payload
+
+
 def save_race_details(race_details_payload: dict):
     RACES_DIR.mkdir(parents=True, exist_ok=True)
     expected_files = {RACES_INDEX_PATH.name}
@@ -949,6 +1114,7 @@ def save_race_details(race_details_payload: dict):
 
 
 def main():
+    print(f"hourly-data root: {DATA_ROOT_DIR}")
     schedule_config = load_json(SCHEDULE_CONFIG_PATH, default={}) or {}
     rotation_state = load_json(ROTATION_STATE_PATH, default={}) or {}
     runtime_state = load_json(RUNTIME_STATE_PATH, default={}) or {}
@@ -956,7 +1122,7 @@ def main():
     event_config = load_json(resolve_event_config_path(schedule_config), default={}) or {}
     event_rules = load_json(resolve_event_rules_path(schedule_config), default={}) or {}
     results_dir_path = resolve_results_dir_path(schedule_config)
-    schedule_items = planning.build_schedule_slots(schedule_config, rotation_state)
+    schedule_items = planning.build_calendar_slots(schedule_config, rotation_state)
     runtime_state, schedule_items = planning.ensure_planned_weather(runtime_state, schedule_items, schedule_config)
     schedule_data = {"items": schedule_items, "updated_at": now_local_iso()}
     announcement = build_announcement(schedule_data, schedule_config, settings_data, event_config, event_rules)
@@ -964,15 +1130,20 @@ def main():
     save_json(ROTATION_STATE_PATH, rotation_state)
     save_json(RUNTIME_STATE_PATH, runtime_state)
     save_json(SCHEDULE_PATH, schedule_data)
+    save_json(CALENDAR_PATH, schedule_data)
     save_json(ANNOUNCEMENT_PATH, announcement)
     save_json(RECENT_RACES_PATH, recent_races_summary)
     save_json(RACES_INDEX_PATH, recent_races_summary)
     save_race_details(recent_races_details)
+    championship_payload = publish_active_championship(schedule_config)
     print("publisher.py completed successfully.")
     print(f"schedule.json updated: {SCHEDULE_PATH}")
+    print(f"calendar.json updated: {CALENDAR_PATH}")
     print(f"announcement.json updated: {ANNOUNCEMENT_PATH}")
     print(f"recent_races.json updated: {RECENT_RACES_PATH}")
     print(f"races index updated: {RACES_INDEX_PATH}")
+    if championship_payload:
+        print(f"championship updated: {championship_payload['slug']}")
 
 
 if __name__ == "__main__":

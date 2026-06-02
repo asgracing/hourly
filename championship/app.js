@@ -20,6 +20,8 @@ const translations = {
     navChampionship: "Championship",
     navStandings: "Standings",
     navPastRaces: "Past races",
+    navMore: "More",
+    navMoreAriaLabel: "Open extra navigation",
     championship: "Championship",
     championshipEvent: "Championship Event",
     activeChampionship: "Active ASG Racing championship.",
@@ -61,6 +63,8 @@ const translations = {
     navChampionship: "Чемпионат",
     navStandings: "Таблица",
     navPastRaces: "Прошедшие гонки",
+    navMore: "Еще",
+    navMoreAriaLabel: "Открыть дополнительную навигацию",
     championship: "Чемпионат",
     championshipEvent: "Событие чемпионата",
     activeChampionship: "Активный чемпионат ASG Racing.",
@@ -428,11 +432,96 @@ function applyTranslations() {
   document.querySelectorAll("[data-i18n]").forEach(element => {
     element.textContent = t(element.dataset.i18n);
   });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach(element => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
+  });
   document.querySelectorAll(".lang-btn").forEach(button => {
     const active = button.dataset.lang === currentLang;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", active ? "true" : "false");
   });
+  document.getElementById("top-nav-more")?.rebuildOverflowMenu?.();
+}
+
+function bindTopNavMoreMenu() {
+  const root = document.getElementById("top-nav-more");
+  const toggle = document.getElementById("top-nav-more-toggle");
+  const menu = document.getElementById("top-nav-more-menu");
+  const navMenu = document.querySelector(".top-nav-menu");
+  const items = navMenu ? [...navMenu.querySelectorAll("[data-nav-item='true']")] : [];
+  if (!root || !toggle || !menu || !navMenu || !items.length || root.dataset.bound === "true") return;
+
+  const closeMenu = () => {
+    toggle.setAttribute("aria-expanded", "false");
+    menu.hidden = true;
+    root.classList.remove("is-open");
+  };
+
+  const rebuildOverflowMenu = () => {
+    menu.innerHTML = "";
+    items.forEach(item => {
+      item.hidden = false;
+    });
+    root.classList.remove("is-visible");
+    root.hidden = true;
+    closeMenu();
+
+    if (window.innerWidth > 980) return;
+
+    root.hidden = false;
+    root.classList.add("is-visible");
+    const toggleWidth = root.offsetWidth || 96;
+    const navRect = navMenu.getBoundingClientRect();
+    const maxVisibleRight = navRect.width - toggleWidth - 10;
+    items.forEach(item => {
+      const itemRightEdge = item.offsetLeft + item.offsetWidth;
+      if (itemRightEdge > maxVisibleRight) item.hidden = true;
+    });
+
+    const hiddenItems = items.filter(item => item.hidden);
+    if (!hiddenItems.length) {
+      root.classList.remove("is-visible");
+      root.hidden = true;
+      return;
+    }
+
+    hiddenItems.forEach(item => {
+      const clone = item.cloneNode(true);
+      clone.className = item.classList.contains("championship-nav-link")
+        ? "top-nav-more-link top-nav-more-link-championship"
+        : "top-nav-more-link";
+      clone.hidden = false;
+      clone.removeAttribute("data-nav-item");
+      menu.appendChild(clone);
+    });
+  };
+
+  const openMenu = () => {
+    toggle.setAttribute("aria-expanded", "true");
+    menu.hidden = false;
+    root.classList.add("is-open");
+  };
+
+  toggle.addEventListener("click", event => {
+    event.preventDefault();
+    if (menu.hidden) openMenu();
+    else closeMenu();
+  });
+  document.addEventListener("click", event => {
+    if (!root.contains(event.target)) closeMenu();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeMenu();
+  });
+  menu.addEventListener("click", event => {
+    if (event.target.closest("a")) closeMenu();
+  });
+  window.addEventListener("resize", rebuildOverflowMenu);
+
+  requestAnimationFrame(rebuildOverflowMenu);
+  window.addEventListener("load", rebuildOverflowMenu, { once: true });
+  root.rebuildOverflowMenu = rebuildOverflowMenu;
+  root.dataset.bound = "true";
 }
 
 function bindLightbox() {
@@ -464,6 +553,7 @@ function bindLightbox() {
 
 async function init() {
   applyTranslations();
+  bindTopNavMoreMenu();
   document.querySelectorAll(".lang-btn").forEach(button => {
     button.addEventListener("click", () => {
       currentLang = button.dataset.lang || "en";

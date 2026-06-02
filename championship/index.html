@@ -8,8 +8,8 @@
   <meta name="robots" content="index, follow" />
   <meta name="theme-color" content="#0b0f14" />
   <link rel="canonical" href="https://asgracing.ru/hourly/championship/" />
-  <link rel="stylesheet" href="../styles.css?v=20260602championship6" />
-  <link rel="stylesheet" href="./styles.css?v=20260602championship6" />
+  <link rel="stylesheet" href="../styles.css?v=20260602championship7" />
+  <link rel="stylesheet" href="./styles.css?v=20260602championship7" />
 </head>
 <body id="top">
   <nav class="top-nav" id="top-nav">
@@ -27,10 +27,25 @@
       </div>
       <div class="top-nav-center">
         <div class="top-nav-menu">
-          <a class="top-nav-link top-nav-link-secondary" href="../" data-i18n="navHourly">Hourly Race</a>
-          <a class="top-nav-link top-nav-link-secondary is-current championship-nav-link" href="./" data-i18n="navChampionship">Championship</a>
-          <a class="top-nav-link top-nav-link-secondary" href="#championship-standings-section" data-i18n="navStandings">Standings</a>
-          <a class="top-nav-link top-nav-link-secondary" href="#championship-race-results-section" data-i18n="navPastRaces">Past races</a>
+          <a class="top-nav-link top-nav-link-secondary" href="../" data-i18n="navHourly" data-nav-item="true">Hourly Race</a>
+          <a class="top-nav-link top-nav-link-secondary is-current championship-nav-link" href="./" data-i18n="navChampionship" data-nav-item="true">Championship</a>
+          <a class="top-nav-link top-nav-link-secondary" href="#championship-standings-section" data-i18n="navStandings" data-nav-item="true">Standings</a>
+          <a class="top-nav-link top-nav-link-secondary" href="#championship-race-results-section" data-i18n="navPastRaces" data-nav-item="true">Past races</a>
+          <div class="top-nav-more" id="top-nav-more">
+            <button
+              class="top-nav-link top-nav-link-secondary top-nav-more-toggle"
+              id="top-nav-more-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-label="Open extra navigation"
+              data-i18n-aria-label="navMoreAriaLabel"
+            >
+              <span class="top-nav-more-icon" aria-hidden="true">☰</span>
+              <span class="top-nav-more-text" data-i18n="navMore">More</span>
+            </button>
+            <div class="top-nav-more-menu" id="top-nav-more-menu" hidden></div>
+          </div>
         </div>
       </div>
       <div class="top-nav-actions">
@@ -100,6 +115,6 @@
     </div>
   </main>
 
-  <script src="./app.js?v=20260602championship6" defer></script>
+  <script src="./app.js?v=20260602championship7" defer></script>
 </body>
 </html>

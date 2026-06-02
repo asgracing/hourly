@@ -119,6 +119,10 @@
         <div class="hero-grid">
           <section class="hero-server-card">
             <div class="hero-server-grid hero-server-grid-major">
+              <div class="hero-server-item hero-server-item-emphasis hero-event-track">
+                <div class="label" data-i18n="labelTrack">Track</div>
+                <div class="value" id="announcement-track">--</div>
+              </div>
               <div class="hero-server-item hero-server-item-emphasis">
                 <div class="label" data-i18n="heroServerLabel">Server</div>
                 <div class="hero-copy-row">
@@ -161,10 +165,6 @@
 
             <div class="hero-server-stack">
               <div class="hero-server-grid hero-server-grid-major hero-event-grid">
-                <div class="hero-server-item hero-server-item-emphasis hero-event-track">
-                  <div class="label" data-i18n="labelTrack">Track</div>
-                  <div class="value" id="announcement-track">--</div>
-                </div>
                 <div class="hero-server-item">
                   <div class="label" data-i18n="labelDate">Date</div>
                   <div class="value" id="announcement-date">--</div>
@@ -210,15 +210,15 @@
             <div id="hero-vote"></div>
           </section>
 
-          <aside class="hero-announcement-card" id="announcement">
+          <aside class="hero-announcement-card" id="announcement" role="link" tabindex="0" aria-label="Open championship">
             <div class="hero-announcement-head">
               <div>
                 <div class="eyebrow hero-announcement-eyebrow" data-i18n="championshipEyebrow">Championship</div>
+                <div class="championship-summary-title" id="hero-championship-title">--</div>
               </div>
             </div>
 
             <div class="championship-summary">
-              <div class="championship-summary-title" id="hero-championship-title">--</div>
               <div class="championship-summary-meta" id="hero-championship-meta">--</div>
               <div class="championship-next-card" id="hero-championship-next-card">
                 <div class="event-type-badge" id="hero-championship-badge">Championship Event</div>

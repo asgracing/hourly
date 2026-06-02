@@ -473,7 +473,7 @@ async function init() {
     const loadedData = await loadJsonOrNull(`${dataBase}/events/${encodeURIComponent(slug)}/index.json`);
     const data = loadedData || {
       slug,
-      title: announcement?.championship_title || announcement?.championship?.title || t("championship"),
+      title: announcement?.championship_title || announcement?.championship?.title || firstChampionship?.championship_title || "ASG Racing June 2026",
       status: announcement?.championship?.status || "active",
       period: announcement?.championship?.period,
       description: announcement?.championship?.description || "",
@@ -485,7 +485,7 @@ async function init() {
     const races = await loadRaceDetails(data, slug);
     const standings = normalizeStandings(data);
 
-    document.getElementById("championship-title").textContent = data.title || announcement?.championship_title || slug;
+    document.getElementById("championship-title").textContent = data.title || announcement?.championship_title || firstChampionship?.championship_title || "ASG Racing June 2026";
     document.getElementById("championship-status").textContent = [data.period, data.status].filter(Boolean).join(" · ") || t("championship");
     document.getElementById("championship-description").textContent = data.description || t("activeChampionship");
 

@@ -67,10 +67,14 @@ function getExpiringStorageValue(storageKey, ttlMs) {
       const parsed = JSON.parse(rawValue);
       if (parsed && typeof parsed.value === "string") {
         if (!parsed.expiresAt || Number(parsed.expiresAt) > now) {
+          console.log(`[STORAGE] ${storageKey}: найдено сохраненное значение (expires in ${Number(parsed.expiresAt) - now}ms)`);
           return parsed.value;
+        } else {
+          console.log(`[STORAGE] ${storageKey}: значение истекло`);
         }
       }
     } catch (error) {
+      console.warn(`[STORAGE] ${storageKey}: ошибка парсинга`, error);
       if (rawValue.trim()) {
         localStorage.setItem(
           storageKey,
@@ -86,14 +90,19 @@ function getExpiringStorageValue(storageKey, ttlMs) {
   }
 
   const generated = `browser-${now.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify({
-      value: generated,
-      createdAt: now,
-      expiresAt: now + ttlMs
-    })
-  );
+  console.log(`[STORAGE] ${storageKey}: генерируем новое значение: ${generated}`);
+  try {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        value: generated,
+        createdAt: now,
+        expiresAt: now + ttlMs
+      })
+    );
+  } catch (error) {
+    console.error(`[STORAGE] ${storageKey}: ошибка при сохранении в localStorage:`, error);
+  }
   return generated;
 }
 
@@ -971,27 +980,35 @@ function getVoteState(item) {
 }
 async function loadVotesForSchedule(items) {
   if (!votesApiBase) {
+    console.warn('[VOTES] API не настроена в meta tag');
     votesEnabled = false;
     votesLoaded = false;
     voteStateByEventId = {};
     return;
   }
   const eventIds = items.filter(item => !isVotingDisabledForItem(item)).map(buildSlotEventId).filter(Boolean);
+  console.log('[VOTES] Loading votes for event_ids:', eventIds, 'voter_id:', getBrowserVoterId());
   if (!eventIds.length) return;
   try {
     const url = new URL("/votes", votesApiBase);
     url.searchParams.set("event_ids", eventIds.join(","));
     url.searchParams.set("voter_id", getBrowserVoterId());
+    console.log('[VOTES] GET запрос к:', url.toString());
     const response = await fetchWithTimeout(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      console.error('[VOTES] HTTP error:', response.status, response.statusText);
+      throw new Error(`HTTP ${response.status}`);
+    }
     const payload = await response.json();
+    console.log('[VOTES] Получены голоса:', payload);
     if (payload?.items && typeof payload.items === "object") {
       voteStateByEventId = { ...voteStateByEventId, ...payload.items };
       votesEnabled = true;
       votesLoaded = true;
     }
   } catch (error) {
-    console.error(error);
+    console.error('[VOTES] Ошибка при загрузке голосов:', error);
+    console.error('[VOTES] votesApiBase:', votesApiBase);
     votesEnabled = Boolean(votesApiBase);
   }
 }
@@ -999,29 +1016,37 @@ async function submitVote(item) {
   if (!votesApiBase) return;
   const eventId = buildSlotEventId(item);
   if (!eventId || pendingVoteEventIds.has(eventId) || voteStateByEventId[eventId]?.already_voted) return;
+  console.log('[VOTE] Отправляем голос для:', eventId);
   pendingVoteEventIds.add(eventId);
   renderScheduleTable(scheduleItems);
   try {
+    const voterId = getBrowserVoterId();
+    const body = {
+      event_id: eventId,
+      track: getLocalizedField(item, "track_name", item?.track_name || item?.track_code || "-"),
+      date: item?.date || "",
+      time: item?.start_time_local || "",
+      voter_id: voterId
+    };
+    console.log('[VOTE] Отправляем:', body);
     const response = await fetch(new URL("/vote", votesApiBase), {
       method: "POST",
       headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({
-        event_id: eventId,
-        track: getLocalizedField(item, "track_name", item?.track_name || item?.track_code || "-"),
-        date: item?.date || "",
-        time: item?.start_time_local || "",
-        voter_id: getBrowserVoterId()
-      })
+      body: JSON.stringify(body)
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      console.error('[VOTE] HTTP error:', response.status);
+      throw new Error(`HTTP ${response.status}`);
+    }
     const payload = await response.json();
+    console.log('[VOTE] Ответ:', payload);
     voteStateByEventId[eventId] = {
       event_id: eventId,
       votes: typeof payload?.votes === "number" ? payload.votes : 0,
       already_voted: Boolean(payload?.already_voted)
     };
   } catch (error) {
-    console.error(error);
+    console.error('[VOTE] Ошибка:', error);
     voteStateByEventId[eventId] = {
       ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false }),
       failed: true

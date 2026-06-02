@@ -942,12 +942,8 @@ def cleanup_state(state, active_event_id):
 
 
 def trigger_already_sent(event_state, trigger_key):
-    legacy_keys = {
-        "12_msk": ("12_msk", "3h", "2h"),
-        "18_msk": ("18_msk", "16_msk", "1h", "15m"),
-    }
     sent = event_state.get("sent") or {}
-    return any(sent.get(key) for key in legacy_keys.get(trigger_key, (trigger_key,)))
+    return bool(sent.get(trigger_key))
 
 
 def run():
@@ -1011,10 +1007,14 @@ def run():
     triggers = build_windows()
     for trigger_key, trigger_config in triggers.items():
         if trigger_already_sent(event_state, trigger_key):
+            print(f"skip {trigger_key}: already sent for {event_id}")
             continue
         if time_until_start <= timedelta():
+            print(f"skip {trigger_key}: event already started for {event_id}")
             continue
         if not is_due(now, time_until_start, trigger_config):
+            now_msk = now.astimezone(MSK_TIMEZONE).isoformat(timespec="minutes")
+            print(f"skip {trigger_key}: not due; msk now: {now_msk}; time until start: {time_until_start}")
             continue
 
         message = build_plain_message(announcement, trigger_key, time_until_start)

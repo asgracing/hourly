@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 DEFAULT_LOOKAHEAD_SLOTS = 3
 DEFAULT_VISIBLE_SLOTS = 3
+DEFAULT_CALENDAR_DAYS_AHEAD = 62
 DEFAULT_WEATHER_PROFILES = [
     {
         "id": 1,
@@ -57,6 +58,11 @@ def build_event_id(date_value, time_value, track_code=None):
     safe_date = date_value or "unknown-date"
     safe_time = (time_value or "0000").replace(":", "")
     return f"hourly_{safe_date}_{safe_time}"
+
+
+def event_type_for_slot(slot: dict | None) -> str:
+    event_type = str((slot or {}).get("event_type") or (slot or {}).get("type") or "hourly").strip().lower()
+    return event_type if event_type else "hourly"
 
 
 def parse_slot_datetime(item: dict):
@@ -149,6 +155,11 @@ def find_override(schedule_config: dict, slot_date: str, slot_time: str):
     for entry in schedule_config.get("overrides") or []:
         if matches_slot(entry, slot_date, slot_time):
             return entry
+    for entry in schedule_config.get("championship_events") or []:
+        if matches_slot(entry, slot_date, slot_time):
+            payload = deepcopy(entry)
+            payload["event_type"] = "championship"
+            return payload
     return None
 
 
@@ -275,7 +286,72 @@ def generate_planned_weather(schedule_config: dict):
     }
 
 
-def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_time=None):
+def get_calendar_days_ahead(schedule_config: dict) -> int:
+    value = (schedule_config.get("calendar") or {}).get("days_ahead", schedule_config.get("calendar_days_ahead"))
+    try:
+        days = int(value)
+    except (TypeError, ValueError):
+        days = DEFAULT_CALENDAR_DAYS_AHEAD
+    return max(days, 7)
+
+
+def normalize_slot_weather_override(override: dict | None):
+    if not isinstance(override, dict):
+        return None
+    weather = override.get("weather")
+    if not isinstance(weather, dict):
+        weather = {
+            "profile_id": override.get("weather_profile_id"),
+            "ambient_temp_c": override.get("ambient_temp_c"),
+            "cloud_level": override.get("cloud_level"),
+            "rain_level": override.get("rain_level"),
+            "weather_randomness": override.get("weather_randomness"),
+            "summary_key": override.get("weather_summary_key"),
+        }
+    cleaned = {key: value for key, value in weather.items() if value is not None}
+    if not cleaned:
+        return None
+    cleaned["summary_key"] = cleaned.get("summary_key") or build_weather_summary_key(
+        cleaned.get("cloud_level"),
+        cleaned.get("rain_level"),
+    )
+    return cleaned
+
+
+def apply_slot_override(item: dict, override: dict | None):
+    if not isinstance(override, dict):
+        return item
+    event_type = event_type_for_slot(override)
+    item["event_type"] = event_type
+    item["voting_disabled"] = bool(override.get("voting_disabled", event_type == "championship"))
+    for key in [
+        "title",
+        "subtitle",
+        "badge_label",
+        "championship_slug",
+        "championship_title",
+        "details_url",
+        "event_config_template",
+        "event_rules_template",
+    ]:
+        if override.get(key) is not None:
+            item[key] = override.get(key)
+    if event_type == "championship" and not item.get("details_url"):
+        slug = item.get("championship_slug") or (schedule_config.get("championship") or {}).get("active_slug")
+        if slug:
+            item["details_url"] = f"/events/?slug={slug}"
+    for key in ["event_config_overrides", "event_rules_overrides"]:
+        if isinstance(override.get(key), dict):
+            item[key] = deepcopy(override[key])
+    weather_override = normalize_slot_weather_override(override)
+    if weather_override:
+        item["weather"] = weather_override
+        item["weather_locked"] = True
+        item["rain_level"] = weather_override.get("rain_level")
+    return item
+
+
+def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_time=None, slots_ahead: int | None = None):
     timezone_label = schedule_config.get("timezone", "UTC+3")
     launch_times = parse_launch_times(schedule_config)
     tracks = schedule_config.get("tracks") or []
@@ -287,7 +363,8 @@ def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_ti
     next_track_index = rotation_state.get("next_track_index", 0)
     if not isinstance(next_track_index, int):
         next_track_index = 0
-    queue_length = max(planning["slots_ahead"], DEFAULT_VISIBLE_SLOTS + 1)
+    effective_slots_ahead = slots_ahead if isinstance(slots_ahead, int) and slots_ahead > 0 else planning["slots_ahead"]
+    queue_length = max(effective_slots_ahead, DEFAULT_VISIBLE_SLOTS + 1)
     track_queue_codes = [
         code
         for code in (rotation_state.get("track_queue_codes") or [])
@@ -335,7 +412,7 @@ def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_ti
     current_time = current_time or now_local()
     current_date = current_time.date()
     day_offset = 0
-    while len(items) < planning["slots_ahead"] and day_offset < 30:
+    while len(items) < effective_slots_ahead and day_offset < 120:
         slot_date = current_date + timedelta(days=day_offset)
         for launch_time in launch_times:
             slot_dt = datetime.combine(slot_date, launch_time, tzinfo=UTC_PLUS_3)
@@ -355,17 +432,30 @@ def build_schedule_slots(schedule_config: dict, rotation_state: dict, current_ti
                 "date": slot_date_str,
                 "start_time_local": slot_time_str,
                 "timezone": timezone_label,
+                "weekday": slot_dt.strftime("%A").lower(),
+                "month": slot_dt.strftime("%Y-%m"),
                 "track_code": selected_track.get("code"),
                 "track_name": override.get("track_name") if override else None,
                 "slot_label": (override or {}).get("slot_label") or determine_slot_label(launch_time),
                 "status": (override or {}).get("status", "scheduled"),
+                "event_type": "hourly",
+                "voting_disabled": False,
             }
             item["track_name"] = item["track_name"] or selected_track.get("name") or normalize_track_name(selected_track.get("code"))
+            item = apply_slot_override(item, override)
             items.append(item)
-            if len(items) >= planning["slots_ahead"]:
+            if len(items) >= effective_slots_ahead:
                 break
         day_offset += 1
     return items
+
+
+def build_calendar_slots(schedule_config: dict, rotation_state: dict, current_time=None):
+    current_time = current_time or now_local()
+    launch_times = parse_launch_times(schedule_config)
+    days_ahead = get_calendar_days_ahead(schedule_config)
+    slots_ahead = max(days_ahead * max(len(launch_times), 1), DEFAULT_VISIBLE_SLOTS)
+    return build_schedule_slots(schedule_config, rotation_state, current_time=current_time, slots_ahead=slots_ahead)
 
 
 def ensure_planned_weather(runtime_state: dict, schedule_items: list[dict], schedule_config: dict):
@@ -407,7 +497,11 @@ def ensure_planned_weather(runtime_state: dict, schedule_items: list[dict], sche
         if not event_id:
             continue
         item["event_id"] = event_id
-        weather = planned_weather.get(event_id)
+        if item.get("weather_locked") and isinstance(item.get("weather"), dict):
+            weather = item["weather"]
+            planned_weather[event_id] = weather
+        else:
+            weather = planned_weather.get(event_id)
         if not isinstance(weather, dict):
             weather = generate_planned_weather(schedule_config)
             planned_weather[event_id] = weather

@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -18,7 +19,25 @@ import hourly_planning as planning
 
 APP_ROOT_DIR = Path(__file__).resolve().parents[1]
 SERVER_ROOT_DIR = APP_ROOT_DIR.parent
-DATA_ROOT_DIR = SERVER_ROOT_DIR / "hourly-data"
+
+
+def resolve_data_root_dir() -> Path:
+    for env_key in ("HOURLY_DATA_DIR", "ACC_HOURLY_DATA_DIR", "ACC_LEGACY_HOURLY_DATA_DIR"):
+        value = os.getenv(env_key, "").strip()
+        if value:
+            return Path(value).expanduser()
+    candidates = [
+        SERVER_ROOT_DIR / "hourly-data",
+        SERVER_ROOT_DIR / "server" / "hourly-data",
+        APP_ROOT_DIR.parent / "server" / "hourly-data",
+    ]
+    for candidate in candidates:
+        if (candidate / "config" / "schedule_config.json").exists():
+            return candidate
+    return SERVER_ROOT_DIR / "hourly-data"
+
+
+DATA_ROOT_DIR = resolve_data_root_dir()
 CONFIG_DIR = DATA_ROOT_DIR / "config"
 SCHEDULE_CONFIG_PATH = CONFIG_DIR / "schedule_config.json"
 ROTATION_STATE_PATH = CONFIG_DIR / "rotation_state.json"
@@ -46,10 +65,18 @@ def detect_text_encoding(raw: bytes) -> str:
     return "utf-8"
 
 
-def load_json(path: Path):
+def load_json(path: Path, default=None):
+    if not path.exists():
+        if default is not None:
+            return default
+        raise FileNotFoundError(path)
     raw = path.read_bytes()
     encoding = detect_text_encoding(raw)
-    text = raw.decode(encoding)
+    text = raw.decode(encoding).strip()
+    if not text:
+        if default is not None:
+            return default
+        raise ValueError(f"JSON file is empty: {path}")
     return json.loads(text)
 
 
@@ -204,6 +231,20 @@ def resolve_event_config_path(schedule_config: dict) -> Path:
     return server_root / cfg_dir / "event.json"
 
 
+def resolve_event_rules_path(schedule_config: dict) -> Path:
+    server_root = resolve_server_root(schedule_config)
+    event_rules_path = schedule_config.get("event_rules_path")
+
+    if event_rules_path:
+        configured_path = Path(event_rules_path)
+        if configured_path.is_absolute():
+            return configured_path
+        return server_root / configured_path
+
+    cfg_dir = schedule_config.get("cfg_dir", "cfg")
+    return server_root / cfg_dir / "eventRules.json"
+
+
 def resolve_server_exe_path(schedule_config: dict) -> Path:
     server_root = resolve_server_root(schedule_config)
     server_exe = schedule_config.get("server_exe") or "accServer.exe"
@@ -217,6 +258,21 @@ def resolve_results_dir_path(schedule_config: dict) -> Path:
     server_root = resolve_server_root(schedule_config)
     results_dir = schedule_config.get("results_dir") or "results"
     results_dir_path = Path(results_dir)
+    if results_dir_path.is_absolute():
+        return results_dir_path
+    return server_root / results_dir_path
+
+
+def resolve_championship_results_root_path(schedule_config: dict) -> Path:
+    championship = schedule_config.get("championship") or {}
+    server_root = resolve_server_root(schedule_config)
+    results_dir = (
+        championship.get("results_root")
+        or schedule_config.get("championship_results_root")
+        or schedule_config.get("champ_results_root")
+        or "results_champ"
+    )
+    results_dir_path = Path(str(results_dir)).expanduser()
     if results_dir_path.is_absolute():
         return results_dir_path
     return server_root / results_dir_path
@@ -530,6 +586,62 @@ def apply_planned_weather(event_config: dict, planned_weather: dict):
     return event_config
 
 
+def deep_merge_dict(base: dict, override: dict):
+    result = dict(base or {})
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = deep_merge_dict(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def active_championship_config(schedule_config: dict):
+    championship = schedule_config.get("championship")
+    if not isinstance(championship, dict):
+        return {}
+    slug = str(championship.get("active_slug") or championship.get("slug") or "").strip()
+    configs = championship.get("items") or championship.get("championships") or []
+    selected = next((item for item in configs if isinstance(item, dict) and item.get("slug") == slug), None)
+    payload = dict(selected or {})
+    payload.update({key: value for key, value in championship.items() if key not in {"items", "championships"}})
+    if slug:
+        payload["slug"] = slug
+    return payload
+
+
+def template_payload(config: dict, key: str, template_name: str | None = None):
+    templates = config.get(f"{key}_templates") or config.get("templates") or {}
+    if template_name and isinstance(templates, dict) and isinstance(templates.get(template_name), dict):
+        return templates[template_name]
+    value = config.get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def apply_event_templates(schedule_config: dict, selected_slot: dict, event_config: dict, event_rules: dict):
+    if planning.event_type_for_slot(selected_slot) != "championship":
+        return event_config, event_rules
+    championship = active_championship_config(schedule_config)
+    event_config = deep_merge_dict(
+        event_config,
+        template_payload(championship, "event_config", selected_slot.get("event_config_template")),
+    )
+    event_rules = deep_merge_dict(
+        event_rules,
+        template_payload(championship, "event_rules", selected_slot.get("event_rules_template")),
+    )
+    event_config = deep_merge_dict(event_config, selected_slot.get("event_config_overrides") or {})
+    event_rules = deep_merge_dict(event_rules, selected_slot.get("event_rules_overrides") or {})
+    return event_config, event_rules
+
+
+def championship_slug_for_slot(schedule_config: dict, selected_slot: dict):
+    slot_slug = str(selected_slot.get("championship_slug") or "").strip()
+    if slot_slug:
+        return slot_slug
+    return str(active_championship_config(schedule_config).get("slug") or "championship").strip() or "championship"
+
+
 def collect_result_file_names(results_dir_path: Path) -> set[str]:
     if not results_dir_path.exists():
         return set()
@@ -540,6 +652,30 @@ def classify_new_result_files(file_names: set[str]) -> tuple[list[str], list[str
     q_files = sorted(name for name in file_names if name.upper().endswith("_Q.JSON"))
     r_files = sorted(name for name in file_names if name.upper().endswith("_R.JSON"))
     return q_files, r_files
+
+
+def move_championship_result_files(results_dir_path: Path, schedule_config: dict, selected_slot: dict, file_names: set[str]):
+    if planning.event_type_for_slot(selected_slot) != "championship" or not file_names:
+        return []
+    slug = championship_slug_for_slot(schedule_config, selected_slot)
+    target_dir = resolve_championship_results_root_path(schedule_config) / slug
+    target_dir.mkdir(parents=True, exist_ok=True)
+    moved = []
+    for name in sorted(file_names):
+        source = results_dir_path / name
+        if not source.exists() or not source.is_file():
+            continue
+        target = target_dir / name
+        if target.exists():
+            stem = target.stem
+            suffix = target.suffix
+            counter = 2
+            while target.exists():
+                target = target_dir / f"{stem}_{counter}{suffix}"
+                counter += 1
+        shutil.move(str(source), str(target))
+        moved.append(str(target))
+    return moved
 
 
 def update_runtime_state_with_results(runtime_state: dict, q_files: list[str], r_files: list[str]):
@@ -621,9 +757,11 @@ def main(argv: list[str] | None = None):
 
     try:
         logging.info("Hourly orchestrator started.")
+        logging.info("Hourly data root: %s", DATA_ROOT_DIR)
+        logging.info("Hourly config dir: %s", CONFIG_DIR)
         schedule_config = load_json(SCHEDULE_CONFIG_PATH)
-        rotation_state = load_json(ROTATION_STATE_PATH)
-        runtime_state = load_json(RUNTIME_STATE_PATH)
+        rotation_state = load_json(ROTATION_STATE_PATH, default={})
+        runtime_state = load_json(RUNTIME_STATE_PATH, default={})
         publish_only_mode = resolve_publish_only_mode(args)
         if publish_only_mode:
             run_duration_seconds, run_mode = 0, "publish_only"
@@ -655,6 +793,7 @@ def main(argv: list[str] | None = None):
             )
 
         event_config_path = resolve_event_config_path(schedule_config)
+        event_rules_path = resolve_event_rules_path(schedule_config)
         server_exe_path = resolve_server_exe_path(schedule_config)
         results_dir_path = resolve_results_dir_path(schedule_config)
         track_key = get_track_key(schedule_config)
@@ -664,6 +803,7 @@ def main(argv: list[str] | None = None):
         logging.info("Selected track candidate: %s", selected_track["code"])
         logging.info("Resolved slot event id: %s", selected_slot.get("event_id"))
         logging.info("Resolved ACC event config path: %s", event_config_path)
+        logging.info("Resolved ACC event rules path: %s", event_rules_path)
         logging.info("Resolved server exe path: %s", server_exe_path)
         logging.info("Resolved results dir path: %s", results_dir_path)
 
@@ -680,6 +820,8 @@ def main(argv: list[str] | None = None):
 
         if not event_config_path.exists():
             raise FileNotFoundError(f"ACC event config not found: {event_config_path}")
+        if not event_rules_path.exists():
+            raise FileNotFoundError(f"ACC event rules not found: {event_rules_path}")
         if not server_exe_path.exists():
             raise FileNotFoundError(f"ACC server executable not found: {server_exe_path}")
         if not results_dir_path.exists():
@@ -689,9 +831,11 @@ def main(argv: list[str] | None = None):
         logging.info("Existing result files before run: %s", len(existing_result_files))
 
         event_config, event_encoding = load_json_with_encoding(event_config_path)
+        event_rules, event_rules_encoding = load_json_with_encoding(event_rules_path)
         previous_track = event_config.get(track_key)
         event_config[track_key] = selected_track["code"]
         event_config = apply_planned_weather(event_config, planned_weather)
+        event_config, event_rules = apply_event_templates(schedule_config, selected_slot, event_config, event_rules)
         logging.info("Previous track: %s", previous_track)
         logging.info("Writing new track '%s' into key '%s'", selected_track["code"], track_key)
         if planned_weather:
@@ -704,6 +848,7 @@ def main(argv: list[str] | None = None):
             )
 
         save_json(event_config_path, event_config, encoding=event_encoding)
+        save_json(event_rules_path, event_rules, encoding=event_rules_encoding)
         if consume_queue:
             save_json(
                 ROTATION_STATE_PATH,
@@ -744,17 +889,22 @@ def main(argv: list[str] | None = None):
         current_result_files = collect_result_file_names(results_dir_path)
         new_result_files = current_result_files - existing_result_files
         q_files, r_files = classify_new_result_files(new_result_files)
+        moved_championship_files = move_championship_result_files(results_dir_path, schedule_config, selected_slot, new_result_files)
         logging.info("New result files detected: %s", len(new_result_files))
         logging.info("New Q files: %s", q_files if q_files else "none")
         logging.info("New R files: %s", r_files if r_files else "none")
+        if moved_championship_files:
+            logging.info("Moved championship result files: %s", moved_championship_files)
 
         runtime_state = update_runtime_state_with_results(runtime_state, q_files, r_files)
+        runtime_state["last_championship_result_files"] = moved_championship_files
         save_json(RUNTIME_STATE_PATH, runtime_state)
 
         run_publisher()
 
         logging.info("Reference event config: %s", REFERENCE_EVENT_PATH)
         logging.info("ACC event config: %s", event_config_path)
+        logging.info("ACC event rules: %s", event_rules_path)
         logging.info("ACC server executable: %s", server_exe_path)
         logging.info("ACC results dir: %s", results_dir_path)
         logging.info("Track key: %s", track_key)
@@ -778,7 +928,7 @@ def main(argv: list[str] | None = None):
         logging.info("Hourly orchestrator completed successfully.")
     except Exception as exc:
         try:
-            runtime_state = load_json(RUNTIME_STATE_PATH)
+            runtime_state = load_json(RUNTIME_STATE_PATH, default={})
         except Exception:
             runtime_state = {}
 

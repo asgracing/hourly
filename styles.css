@@ -1397,7 +1397,7 @@ tbody tr:not(.is-interactive-row):hover {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
   background:
-    linear-gradient(118deg, rgba(7, 11, 16, 0.2) 0%, rgba(7, 11, 16, 0.2) 38%, rgba(7, 11, 16, 0.2) 100%),
+    linear-gradient(118deg, rgba(7, 11, 16, 0.08) 0%, rgba(7, 11, 16, 0.12) 38%, rgba(7, 11, 16, 0.22) 100%),
     radial-gradient(circle at top right, rgba(255, 184, 77, 0.12), transparent 30%),
     var(--schedule-track-photo),
     rgba(10, 16, 24, 0.96);
@@ -1469,6 +1469,11 @@ tbody tr:not(.is-interactive-row):hover {
 }
 
 .schedule-event-track {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(241, 245, 249, 0.18);
   font-size: 1.5rem;
   font-weight: 900;
   line-height: 1.05;
@@ -2407,11 +2412,15 @@ body.modal-open {
   }
 
   #hero-vote {
-    order: -1;
+    order: 3;
   }
 
   .hero-server-grid-major {
     order: 1;
+  }
+
+  .hero-connect-actions {
+    order: 2;
   }
 
   .hero-server-grid-minor {
@@ -2419,7 +2428,7 @@ body.modal-open {
   }
 
   .hero-server-stack {
-    order: 3;
+    order: 4;
   }
 
   .hero-server-card {
@@ -2695,15 +2704,19 @@ body.modal-open {
   }
 
   #hero-vote {
-    order: -1;
+    order: 3;
   }
 
   .hero-server-grid-major {
     order: 1;
   }
 
-  .hero-server-stack {
+  .hero-connect-actions {
     order: 2;
+  }
+
+  .hero-server-stack {
+    order: 4;
   }
 
   .hero-server-item,

@@ -71,15 +71,19 @@
   backdrop-filter: blur(7px);
 }
 
-.championship-page .championship-upcoming .schedule-event-card {
+#championship-upcoming .schedule-event-card {
   background:
-    linear-gradient(118deg, rgba(7, 11, 16, 0.22) 0%, rgba(7, 11, 16, 0.12) 42%, rgba(7, 11, 16, 0.26) 100%),
-    radial-gradient(circle at top right, rgba(168, 85, 247, 0.2), transparent 34%),
     var(--schedule-track-photo),
+    linear-gradient(118deg, rgba(7, 11, 16, 0.08) 0%, rgba(7, 11, 16, 0.12) 42%, rgba(7, 11, 16, 0.24) 100%),
+    radial-gradient(circle at top right, rgba(168, 85, 247, 0.2), transparent 34%),
     rgba(22, 31, 43, 0.72);
-  background-position: center, top right, center, center;
-  background-size: cover, auto, cover, cover;
+  background-position: center, center, top right, center;
+  background-size: cover, cover, auto, cover;
   background-repeat: no-repeat;
+}
+
+.championship-page .schedule-event-track {
+  background: rgba(241, 245, 249, 0.2);
 }
 
 .championship-standings-table th,
@@ -257,5 +261,69 @@
 
   .championship-race-summary {
     text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .championship-page {
+    width: min(100% - 20px, 1200px);
+    gap: 12px;
+  }
+
+  .championship-hero {
+    gap: 14px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .championship-hero h1 {
+    font-size: clamp(1.9rem, 10vw, 2.65rem);
+  }
+
+  .championship-hero p {
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .championship-section.card {
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .championship-section .section-head {
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  #championship-upcoming.schedule-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #championship-upcoming .schedule-event-card {
+    min-height: 190px;
+    border-radius: 18px;
+  }
+
+  .championship-page .schedule-event-card-inner {
+    max-width: calc(100% - 20px);
+    margin: 10px;
+    padding: 13px;
+    border-radius: 14px;
+  }
+
+  .championship-page .schedule-event-track {
+    font-size: 1.2rem;
+  }
+
+  .championship-progress-card,
+  .championship-prize-thumb,
+  .championship-race-card {
+    border-radius: 14px;
+  }
+
+  .championship-table-wrap {
+    overflow-x: auto;
   }
 }

@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,8 +42,8 @@ jobs:
           TELEGRAM_PIN_MESSAGE: ${{ vars.TELEGRAM_PIN_MESSAGE }}
           TELEGRAM_PIN_DISABLE_NOTIFICATION: ${{ vars.TELEGRAM_PIN_DISABLE_NOTIFICATION }}
           TELEGRAM_UNPIN_PREVIOUS_MESSAGE: ${{ vars.TELEGRAM_UNPIN_PREVIOUS_MESSAGE }}
-          HOURLY_NOTIFY_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
-          HOURLY_NOTIFY_FORCE_SEND: ${{ github.event.inputs.force_send == 'true' && 'true' || 'false' }}
+          HOURLY_NOTIFY_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+          HOURLY_NOTIFY_FORCE_SEND: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_send == 'true' && 'true' || 'false' }}
         run: python scripts/hourly_notify.py
 
       - name: Commit updated notify state

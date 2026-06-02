@@ -339,7 +339,7 @@ def apply_slot_override(item: dict, override: dict | None):
     if event_type == "championship" and not item.get("details_url"):
         slug = item.get("championship_slug") or (schedule_config.get("championship") or {}).get("active_slug")
         if slug:
-            item["details_url"] = f"/events/?slug={slug}"
+            item["details_url"] = f"/hourly/championship/?slug={slug}"
     for key in ["event_config_overrides", "event_rules_overrides"]:
         if isinstance(override.get(key), dict):
             item[key] = deepcopy(override[key])

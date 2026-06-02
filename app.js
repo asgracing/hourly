@@ -144,6 +144,9 @@ const translations = {
     calendarEmpty: "No calendar events yet.",
     championshipBadge: "Championship Event",
     hourlyBadge: "Hourly Race",
+    championshipEyebrow: "Championship",
+    championshipOpenButton: "Open championship",
+    championshipNoDescription: "Follow the active championship progress, upcoming races and standings.",
     votingDisabledChampionship: "Voting is disabled for championship events",
     voteButton: "I want to race!",
     voteButtonDone: "You're in",
@@ -342,6 +345,9 @@ Object.assign(translations.ru, {
   calendarEmpty: "Пока нет событий в календаре.",
   championshipBadge: "Событие чемпионата",
   hourlyBadge: "Часовая гонка",
+  championshipEyebrow: "Чемпионат",
+  championshipOpenButton: "Открыть чемпионат",
+  championshipNoDescription: "Следи за прогрессом активного чемпионата, ближайшими гонками и таблицей.",
   votingDisabledChampionship: "Голосование для событий чемпионата отключено"
 });
 
@@ -1231,6 +1237,18 @@ function renderHeroDetails(data) {
   setHeroTokenValue("hero-weather", buildWeatherTokenGroups(weather));
   updateHeroConnectLink(server);
 }
+function renderChampionshipHero(data) {
+  const titleEl = document.getElementById("hero-championship-title");
+  const metaEl = document.getElementById("hero-championship-meta");
+  const descriptionEl = document.getElementById("hero-championship-description");
+  const buttonEl = document.querySelector(".championship-summary-btn");
+  const championship = data?.championship || {};
+  const title = data?.championship_title || championship.title || t("championshipBadge");
+  if (titleEl) titleEl.textContent = title;
+  if (metaEl) metaEl.textContent = [championship.period, championship.status].filter(Boolean).join(" · ") || eventBadgeLabel(data);
+  if (descriptionEl) descriptionEl.textContent = championship.description || t("championshipNoDescription");
+  if (buttonEl) buttonEl.textContent = title;
+}
 function renderSchedule(rows) {
   const container = document.getElementById("schedule-list");
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -1666,6 +1684,7 @@ function renderUI() {
   }
   renderAnnouncement(announcementData || {});
   renderHeroDetails(announcementData || {});
+  renderChampionshipHero(announcementData || {});
   renderHeroVote();
   renderScheduleTable(scheduleItems);
   renderCalendar(scheduleItems);

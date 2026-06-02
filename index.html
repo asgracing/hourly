@@ -50,7 +50,7 @@
   <meta name="twitter:image:alt" content="ASG Racing hourly race preview" />
   <meta name="hourly-votes-api" content="https://hourly-votes.asgracing.workers.dev" />
 
-  <link rel="stylesheet" href="./styles.css?v=20260602calendar2" />
+  <link rel="stylesheet" href="./styles.css?v=20260602championship2" />
   <link rel="stylesheet" href="./legal.css" />
 </head>
 <body id="top">
@@ -160,6 +160,32 @@
             </div>
 
             <div class="hero-server-stack">
+              <div class="hero-server-grid hero-server-grid-major hero-event-grid">
+                <div class="hero-server-item hero-server-item-emphasis hero-event-track">
+                  <div class="label" data-i18n="labelTrack">Track</div>
+                  <div class="value" id="announcement-track">--</div>
+                </div>
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="labelDate">Date</div>
+                  <div class="value" id="announcement-date">--</div>
+                </div>
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="labelTime">Time</div>
+                  <div class="value" id="announcement-time">--</div>
+                </div>
+                <div class="hero-server-item hero-announcement-weather" id="hero-weather-card" tabindex="0" role="button" aria-haspopup="dialog">
+                  <div class="label" data-i18n="heroWeatherLabel">Weather</div>
+                  <div class="value" id="hero-weather">--</div>
+                </div>
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="heroEntryLabel">Entry</div>
+                  <div class="value" id="hero-entry-rules">--</div>
+                </div>
+                <div class="hero-server-item">
+                  <div class="label" data-i18n="heroFormatLabel">Format</div>
+                  <div class="value" id="hero-race-format">--</div>
+                </div>
+              </div>
               <div class="hero-server-grid hero-server-grid-rules">
                 <div class="hero-server-item">
                   <div class="label" data-i18n="heroPitstopLabel">Pitstop</div>
@@ -187,32 +213,15 @@
           <aside class="hero-announcement-card" id="announcement">
             <div class="hero-announcement-head">
               <div>
-                <div class="eyebrow hero-announcement-eyebrow" data-i18n="announcementEyebrow">Next Event</div>
+                <div class="eyebrow hero-announcement-eyebrow" data-i18n="championshipEyebrow">Championship</div>
               </div>
             </div>
 
-            <div class="hero-announcement-inline-meta">
-              <div class="stat hero-announcement-stat-track">
-                <div class="value" id="announcement-track">--</div>
-              </div>
-              <div class="stat hero-announcement-inline-stat hero-announcement-inline-stat-combined">
-                <div class="value" id="hero-entry-rules">--</div>
-                <div class="hero-announcement-inline-divider" aria-hidden="true"></div>
-                <div class="value" id="hero-race-format">--</div>
-              </div>
-            </div>
-
-            <div class="hero-announcement-meta">
-              <div class="stat hero-announcement-stat-plain">
-                <div class="value" id="announcement-date">--</div>
-              </div>
-              <div class="stat hero-announcement-stat-plain">
-                <div class="value" id="announcement-time">--</div>
-              </div>
-            </div>
-
-            <div class="hero-announcement-weather" id="hero-weather-card" tabindex="0" role="button" aria-haspopup="dialog">
-              <div class="value" id="hero-weather">--</div>
+            <div class="championship-summary">
+              <div class="championship-summary-title" id="hero-championship-title">--</div>
+              <div class="championship-summary-meta" id="hero-championship-meta">--</div>
+              <p class="championship-summary-text" id="hero-championship-description">--</p>
+              <a class="championship-summary-btn" href="./championship/" data-i18n="championshipOpenButton">Open championship</a>
             </div>
           </aside>
         </div>
@@ -304,6 +313,6 @@
   </main>
 
   <script src="./legal.js" defer></script>
-  <script src="./app.js?v=20260602calendar2" defer></script>
+  <script src="./app.js?v=20260602championship2" defer></script>
 </body>
 </html>

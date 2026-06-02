@@ -1244,9 +1244,13 @@ function renderChampionshipHero(data) {
   const trackEl = document.getElementById("hero-championship-track");
   const dateEl = document.getElementById("hero-championship-date");
   const weatherEl = document.getElementById("hero-championship-weather");
+  const formatEl = document.getElementById("hero-championship-format");
+  const pitEl = document.getElementById("hero-championship-pit");
   const descriptionEl = document.getElementById("hero-championship-description");
   const buttonEl = document.querySelector(".championship-summary-btn");
   const championship = data?.championship || {};
+  const session = data?.session || {};
+  const rules = data?.rules || {};
   const nextChampionship = scheduleItems.find(isChampionshipEvent) || (isChampionshipEvent(data) ? data : null);
   const title = data?.championship_title || championship.title || nextChampionship?.championship_title || t("championshipBadge");
   if (titleEl) titleEl.textContent = title;
@@ -1255,6 +1259,10 @@ function renderChampionshipHero(data) {
   if (trackEl) trackEl.textContent = nextChampionship ? getLocalizedField(nextChampionship, "track_name", nextChampionship.track_code || "--") : t("unknownValue");
   if (dateEl) dateEl.textContent = nextChampionship ? formatScheduleDateTime(nextChampionship) : t("unknownValue");
   if (weatherEl) weatherEl.textContent = nextChampionship ? buildScheduleCardWeather(nextChampionship) : t("unknownValue");
+  if (formatEl) formatEl.textContent = session.format_label || t("unknownValue");
+  if (pitEl) pitEl.textContent = typeof rules.mandatory_pitstop_count === "number"
+    ? `${t("heroPitstopLabel")}: ${rules.mandatory_pitstop_count}${rules.pit_window_length_minutes ? ` / ${rules.pit_window_length_minutes}m` : ""}`
+    : t("unknownValue");
   if (descriptionEl) descriptionEl.textContent = championship.description || t("championshipNoDescription");
   if (buttonEl) buttonEl.textContent = title;
 }

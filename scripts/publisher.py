@@ -448,10 +448,15 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
             "server_window": f"{schedule_config.get('server_window_minutes', 120) // 60}h",
             "session_label": None,
             "details_url": "/hourly/",
+            "event_type": "hourly",
+            "voting_disabled": False,
+            "championship_slug": None,
+            "championship_title": None,
             "updated_at": now_local_iso(),
             **accessory_info,
             "weather": planned_weather,
         }
+    championship = active_championship_config(schedule_config)
     return {
         "title": schedule_config.get("title", "Часовая гонка"),
         "status": next_item.get("status", "scheduled"),
@@ -463,7 +468,19 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
         "track_name": next_item.get("track_name"),
         "server_window": f"{schedule_config.get('server_window_minutes', 120) // 60}h",
         "session_label": next_item.get("slot_label"),
-        "details_url": "/hourly/",
+        "details_url": next_item.get("details_url") or "/hourly/",
+        "event_type": next_item.get("event_type") or "hourly",
+        "voting_disabled": bool(next_item.get("voting_disabled")),
+        "badge_label": next_item.get("badge_label"),
+        "championship_slug": next_item.get("championship_slug") or (championship or {}).get("slug"),
+        "championship_title": next_item.get("championship_title") or (championship or {}).get("title"),
+        "championship": {
+            "slug": (championship or {}).get("slug"),
+            "title": (championship or {}).get("title"),
+            "status": (championship or {}).get("status"),
+            "period": (championship or {}).get("period"),
+            "description": (championship or {}).get("description"),
+        } if championship else None,
         "updated_at": now_local_iso(),
         **accessory_info,
         "weather": planned_weather,
@@ -1076,6 +1093,11 @@ def publish_active_championship(schedule_config: dict):
         "status": championship.get("status") or "active",
         "period": championship.get("period"),
         "description": championship.get("description") or "",
+        "upcoming_races": [
+            item for item in planning.build_calendar_slots(schedule_config, load_json(ROTATION_STATE_PATH, default={}) or {})
+            if planning.event_type_for_slot(item) == "championship"
+            and (item.get("championship_slug") or slug) == slug
+        ],
         "prizes": championship.get("prizes") or {
             "prize1": championship.get("prize1"),
             "prize2": championship.get("prize2"),

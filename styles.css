@@ -457,6 +457,14 @@ h2 {
   gap: 8px;
 }
 
+.hero-event-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hero-event-track {
+  grid-column: 1 / -1;
+}
+
 .hero-connect-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -901,6 +909,46 @@ h2 {
   font-size: 0.88rem;
 }
 
+.championship-summary {
+  display: grid;
+  gap: 12px;
+  height: 100%;
+  align-content: center;
+}
+
+.championship-summary-title {
+  color: #f5edff;
+  font-size: clamp(1.55rem, 3vw, 2.35rem);
+  font-weight: 950;
+  line-height: 1;
+}
+
+.championship-summary-meta {
+  color: #d8b4fe;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.championship-summary-text {
+  color: #d9ccef;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.championship-summary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(126, 34, 206, 0.98), rgba(168, 85, 247, 0.94));
+  color: #ffffff;
+  font-weight: 950;
+  text-decoration: none;
+  box-shadow: 0 16px 32px rgba(126, 34, 206, 0.28);
+}
+
 .hero-announcement-weather,
 .hero-announcement-meta .stat {
   display: flex;
@@ -1309,6 +1357,12 @@ tbody tr:not(.is-interactive-row):hover {
   box-shadow: 0 24px 44px rgba(0, 0, 0, 0.3);
 }
 
+.schedule-event-card.is-championship-event,
+.calendar-event.is-championship-event {
+  border-color: rgba(255, 209, 102, 0.42);
+  box-shadow: 0 18px 44px rgba(255, 157, 77, 0.12), 0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
 .schedule-event-card-inner {
   display: inline-flex;
   flex-direction: column;
@@ -1323,6 +1377,31 @@ tbody tr:not(.is-interactive-row):hover {
   background: rgba(8, 12, 18, 0.5);
   backdrop-filter: blur(8px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.event-type-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 209, 102, 0.14);
+  color: #ffe5ae;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.schedule-event-card.is-championship-event .event-type-badge,
+.calendar-event.is-championship-event .event-type-badge {
+  border-color: rgba(193, 132, 252, 0.72);
+  background: linear-gradient(135deg, rgba(126, 34, 206, 0.96), rgba(168, 85, 247, 0.9));
+  color: #fbf5ff;
+  box-shadow: 0 10px 24px rgba(126, 34, 206, 0.32);
 }
 
 .schedule-event-time {
@@ -1360,6 +1439,140 @@ tbody tr:not(.is-interactive-row):hover {
   display: grid;
   gap: 8px;
   margin-top: 4px;
+}
+
+.schedule-event-vote-locked,
+.hero-vote-locked {
+  justify-items: start;
+  border-style: dashed;
+}
+
+.calendar-panel {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(8, 12, 18, 0.44);
+  overflow: hidden;
+}
+
+.calendar-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 16px;
+  cursor: pointer;
+  color: #f4f8ff;
+  font-weight: 900;
+}
+
+.calendar-panel-count {
+  min-width: 32px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.78rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+
+.calendar-weekday {
+  padding: 7px 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.calendar-day {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  min-height: 116px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(8, 12, 18, 0.38);
+}
+
+.calendar-day-empty {
+  border-color: transparent;
+  background: transparent;
+}
+
+.calendar-day.is-past {
+  opacity: 0.5;
+}
+
+.calendar-day-number {
+  color: #f4f8ff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.calendar-day-events {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.calendar-event {
+  --calendar-track-photo: none;
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-height: 86px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: left;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(8, 12, 18, 0.44), rgba(8, 12, 18, 0.86)),
+    var(--calendar-track-photo);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+}
+
+.calendar-event-time,
+.calendar-event-track,
+.calendar-event .event-type-badge {
+  position: relative;
+  z-index: 1;
+}
+
+.calendar-event-time {
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 950;
+}
+
+.calendar-event-track {
+  color: #dce8f7;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.calendar-event .event-type-badge {
+  max-width: 100%;
+  padding: 4px 7px;
+  font-size: 0.56rem;
+  line-height: 1.15;
+  white-space: normal;
 }
 
 .schedule-table td:first-child {
@@ -1577,6 +1790,21 @@ tbody tr:not(.is-interactive-row):hover {
 .schedule-modal-vote {
   grid-column: 1 / -1;
   order: 2;
+}
+
+.event-details-link {
+  grid-column: 1 / -1;
+  order: 3;
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 209, 102, 0.16);
+  color: #ffe5ae;
+  font-weight: 900;
+  text-decoration: none;
 }
 
 #schedule-modal .schedule-modal-vote .hero-vote {
@@ -1993,6 +2221,10 @@ body.modal-open {
   }
 
   .hero-server-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-event-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2494,6 +2726,44 @@ body.modal-open {
 
   .schedule-cards-grid {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-grid {
+    gap: 4px;
+    padding: 0 8px 8px;
+  }
+
+  .calendar-weekday {
+    padding: 6px 1px;
+    font-size: 0.58rem;
+  }
+
+  .calendar-day {
+    min-height: 82px;
+    padding: 5px;
+    border-radius: 9px;
+  }
+
+  .calendar-day-number {
+    font-size: 0.68rem;
+  }
+
+  .calendar-event {
+    min-height: 62px;
+    padding: 6px;
+  }
+
+  .calendar-event-time {
+    font-size: 0.72rem;
+  }
+
+  .calendar-event-track {
+    font-size: 0.64rem;
+  }
+
+  .calendar-event .event-type-badge {
+    padding: 3px 5px;
+    font-size: 0.48rem;
   }
 
   .grid.two {

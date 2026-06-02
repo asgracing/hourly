@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Championship | ASG Racing</title>
+  <meta name="description" content="ASG Racing active hourly championship progress, upcoming races and standings." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#0b0f14" />
+  <link rel="canonical" href="https://asgracing.github.io/hourly/championship/" />
+  <link rel="stylesheet" href="../styles.css?v=20260602championship2" />
+  <link rel="stylesheet" href="./styles.css?v=20260602championship2" />
+</head>
+<body id="top">
+  <nav class="top-nav" id="top-nav">
+    <div class="top-nav-inner">
+      <a class="top-nav-brand" href="https://asgracing.github.io/top/" aria-label="ASG Racing home">
+        <img class="top-nav-brand-logo" src="../../top/social/asg.png" alt="" />
+        <span class="top-nav-brand-text">ASG Racing</span>
+      </a>
+      <div class="top-nav-socials">
+        <a class="top-nav-link-primary nav-social nav-social-discord" href="https://discord.gg/cEPFHXXtTC" target="_blank" rel="noopener noreferrer" aria-label="Discord" title="Discord"><img class="social-icon" src="../../top/social/discord.svg" alt="" /></a>
+        <a class="top-nav-link-primary nav-social nav-social-telegram" href="https://t.me/+JUymrENgddcyMTdi" target="_blank" rel="noopener noreferrer" aria-label="Telegram" title="Telegram"><img class="social-icon" src="../../top/social/telegram.svg" alt="" /></a>
+        <a class="top-nav-link-primary nav-social nav-social-youtube" href="https://www.youtube.com/channel/UCwVcW5iUFxcT5Z8AHVqPhTg" target="_blank" rel="noopener noreferrer" aria-label="YouTube" title="YouTube"><img class="social-icon" src="../../top/social/youtube.svg" alt="" /></a>
+      </div>
+      <div class="top-nav-center">
+        <div class="top-nav-menu">
+          <a class="top-nav-link-secondary" href="../">Hourly Race</a>
+          <a class="top-nav-link-secondary is-current championship-nav-link" href="./">Championship</a>
+          <a class="top-nav-link-secondary" href="../#schedule">Events</a>
+          <a class="top-nav-link-secondary" href="../#recent-races">Results</a>
+        </div>
+      </div>
+      <div class="top-nav-actions">
+        <div class="lang-switch top-nav-lang" aria-label="Language switcher">
+          <button class="lang-btn active" type="button" data-lang="en" aria-label="English"><span class="lang-flag"><img src="../../top/social/cif--gb.svg" alt="" /></span></button>
+          <button class="lang-btn" type="button" data-lang="ru" aria-label="Russian"><span class="lang-flag"><img src="../../top/social/cif--ru.svg" alt="" /></span></button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page championship-page">
+    <section class="championship-hero">
+      <div>
+        <div class="eyebrow" id="championship-status">Championship</div>
+        <h1 id="championship-title">Championship</h1>
+        <p id="championship-description">Loading...</p>
+      </div>
+      <div class="championship-progress" id="championship-progress"></div>
+    </section>
+
+    <section class="card championship-section">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Upcoming</div>
+          <h2>Upcoming races</h2>
+        </div>
+      </div>
+      <div id="championship-upcoming" class="schedule-cards-grid"></div>
+    </section>
+
+    <section class="card championship-section">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Standings</div>
+          <h2>Championship results</h2>
+        </div>
+      </div>
+      <div class="table-card table-card-compact">
+        <div class="table-wrap" id="championship-standings"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js?v=20260602championship2" defer></script>
+</body>
+</html>

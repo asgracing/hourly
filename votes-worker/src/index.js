@@ -144,14 +144,17 @@ async function githubFetch(env, path, init = {}, options = {}) {
   if (options.authenticated !== false) {
     headers.authorization = `token ${normalizeGithubToken(env.GITHUB_TOKEN)}`;
   }
+  console.log(`[GITHUB] ${init.method || 'GET'} ${path}`);
   const response = await fetch(`https://api.github.com${path}`, {
     ...init,
     headers
   });
   if (!response.ok) {
     const details = await response.text();
+    console.error(`[GITHUB] Error ${response.status}: ${details.slice(0, 200)}`);
     throw new Error(`GitHub API ${response.status} ${path}: ${details}`);
   }
+  console.log(`[GITHUB] Success ${response.status}`);
   return response;
 }
 
@@ -200,19 +203,32 @@ function chooseCanonicalIssue(issues, eventId) {
 
 async function findIssues(env, eventId, slotHint = null) {
   const canonicalEventId = canonicalizeEventId(eventId);
+  console.log(`[FIND_ISSUES] Searching for ${canonicalEventId}`);
   const allIssues = await listHourlyVoteIssues(env);
-  const titleMatches = allIssues.filter(issue => issue?.title === issueTitle(canonicalEventId));
+  console.log(`[FIND_ISSUES] Total issues in repo: ${allIssues.length}`);
+  const expectedTitle = issueTitle(canonicalEventId);
+  console.log(`[FIND_ISSUES] Expected title: "${expectedTitle}"`);
+  const titleMatches = allIssues.filter(issue => {
+    const isMatch = issue?.title === expectedTitle;
+    if (isMatch) console.log(`[FIND_ISSUES] Title match found: #${issue.number} "${issue.title}"`);
+    return isMatch;
+  });
+  console.log(`[FIND_ISSUES] Title matches: ${titleMatches.length}`);
   const slotMetadata = buildSlotMetadata({ event_id: canonicalEventId, date: slotHint?.date, time: slotHint?.time });
   if (!slotMetadata.date || !slotMetadata.time) {
+    console.log(`[FIND_ISSUES] No slot hint, returning title matches only`);
     return dedupeIssues(titleMatches);
   }
   const slotMatches = allIssues.filter(issue => slotMetadataMatches(parseIssueMetadata(issue?.body), slotMetadata));
-  return dedupeIssues(
+  console.log(`[FIND_ISSUES] Slot metadata matches: ${slotMatches.length}`);
+  const result = dedupeIssues(
     [...titleMatches, ...slotMatches].filter(issue => {
       if (issue?.title === issueTitle(canonicalEventId)) return true;
       return slotMetadataMatches(parseIssueMetadata(issue?.body), slotMetadata);
     })
   );
+  console.log(`[FIND_ISSUES] Final result: ${result.length} issues`);
+  return result;
 }
 
 async function findIssue(env, eventId, slotHint = null) {
@@ -295,15 +311,20 @@ async function handleGetVotes(request, env, origin) {
   if (!eventIds.length) {
     return jsonResponse({ ok: false, error: "event_ids query parameter is required" }, 400, origin);
   }
+  console.log(`[GET_VOTES] Fetching votes for ${eventIds.length} event(s), voter=${voterId.slice(0, 20)}...`);
   const results = {};
   for (const eventId of eventIds) {
+    console.log(`[GET_VOTES] Processing ${eventId}`);
     const issues = await findIssues(env, eventId);
+    console.log(`[GET_VOTES] Found ${issues.length} issues for ${eventId}`);
     if (!issues.length) {
       results[eventId] = { event_id: eventId, votes: 0, already_voted: false };
       continue;
     }
     const comments = await listVoteCommentsForIssues(env, issues);
+    console.log(`[GET_VOTES] Found ${comments.length} comments for ${eventId}`);
     results[eventId] = summarizeVotes(eventId, comments, voterId);
+    console.log(`[GET_VOTES] Summary for ${eventId}: votes=${results[eventId].votes}, already_voted=${results[eventId].already_voted}`);
   }
   return jsonResponse({ ok: true, items: results }, 200, origin);
 }
@@ -321,23 +342,35 @@ async function handlePostVote(request, env, origin) {
     date: payload?.date,
     time: payload?.time
   });
+  console.log(`[VOTE] Processing vote for ${eventId}, voter=${voterId.slice(0, 20)}...`);
   const issues = await findIssues(env, eventId, slot);
+  console.log(`[VOTE] Found ${issues.length} existing issues`);
   const comments = await listVoteCommentsForIssues(env, issues);
   const summary = summarizeVotes(eventId, comments, voterId);
   if (!summary.already_voted) {
     const issue = await ensureIssue(env, slot, issues);
-    await githubFetch(
-      env,
-      `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issue.number}/comments`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ body: `vote:${voterId}` })
-      }
-    );
+    console.log(`[VOTE] Using issue #${issue.number}`);
+    try {
+      await githubFetch(
+        env,
+        `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issue.number}/comments`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json; charset=utf-8" },
+          body: JSON.stringify({ body: `vote:${voterId}` })
+        }
+      );
+      console.log(`[VOTE] Comment added successfully to issue #${issue.number}`);
+    } catch (error) {
+      console.error(`[VOTE] Failed to add comment to issue #${issue.number}: ${error instanceof Error ? error.message : error}`);
+      return jsonResponse({ ok: false, error: `Failed to add vote: ${error instanceof Error ? error.message : 'unknown'}` }, 500, origin);
+    }
     const updatedComments = await listVoteCommentsForIssues(env, dedupeIssues([...issues, issue]));
-    return jsonResponse({ ok: true, ...summarizeVotes(eventId, updatedComments, voterId) }, 200, origin);
+    const result = summarizeVotes(eventId, updatedComments, voterId);
+    console.log(`[VOTE] Final result: votes=${result.votes}, already_voted=${result.already_voted}`);
+    return jsonResponse({ ok: true, ...result }, 200, origin);
   }
+  console.log(`[VOTE] Voter already voted, returning existing summary`);
   return jsonResponse({ ok: true, ...summary }, 200, origin);
 }
 

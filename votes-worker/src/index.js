@@ -25,7 +25,9 @@ function getAllowedOrigin(request, env) {
 function withCors(headers, origin) {
   headers["access-control-allow-origin"] = origin || "*";
   headers["access-control-allow-methods"] = "GET,POST,OPTIONS";
-  headers["access-control-allow-headers"] = "content-type";
+  headers["access-control-allow-headers"] = "content-type, authorization";
+  headers["access-control-max-age"] = "86400";
+  headers["access-control-expose-headers"] = "content-type";
   headers["vary"] = "origin";
   return headers;
 }

@@ -26,6 +26,8 @@ const serverStatusUrl = pageParams.get("serverStatusUrl") || (topApiRoot || hour
 const votesApiBase =
   document.querySelector('meta[name="hourly-votes-api"]')?.getAttribute("content")?.trim() || "";
 const VOTER_ID_STORAGE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+const VOTE_STATE_STORAGE_KEY = "hourlyVoteStateByEventId";
+const VOTE_STATE_STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ACC_CONNECT_SERVER_FALLBACK = {
   hostname: "95.165.92.3",
   port: null,
@@ -104,6 +106,49 @@ function getExpiringStorageValue(storageKey, ttlMs) {
     console.error(`[STORAGE] ${storageKey}: ошибка при сохранении в localStorage:`, error);
   }
   return generated;
+}
+
+function loadStoredVoteState() {
+  try {
+    const rawValue = localStorage.getItem(VOTE_STATE_STORAGE_KEY);
+    if (!rawValue) return {};
+    const parsed = JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== "object") return {};
+    if (parsed.expiresAt && Number(parsed.expiresAt) <= Date.now()) {
+      localStorage.removeItem(VOTE_STATE_STORAGE_KEY);
+      return {};
+    }
+    return parsed.items && typeof parsed.items === "object" ? parsed.items : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveStoredVoteState(items) {
+  try {
+    const normalizedItems = Object.fromEntries(
+      Object.entries(items || {})
+        .filter(([eventId, state]) => eventId && state && typeof state === "object")
+        .map(([eventId, state]) => [
+          eventId,
+          {
+            event_id: state.event_id || eventId,
+            votes: typeof state.votes === "number" ? state.votes : 0,
+            already_voted: Boolean(state.already_voted)
+          }
+        ])
+    );
+    localStorage.setItem(
+      VOTE_STATE_STORAGE_KEY,
+      JSON.stringify({
+        items: normalizedItems,
+        updatedAt: Date.now(),
+        expiresAt: Date.now() + VOTE_STATE_STORAGE_TTL_MS
+      })
+    );
+  } catch (error) {
+    // Vote cache is only a UI fallback; the worker remains the source of truth.
+  }
 }
 
 const translations = {
@@ -423,7 +468,7 @@ let selectedRace = null;
 let hasLoadError = false;
 let votesEnabled = Boolean(votesApiBase);
 let votesLoaded = false;
-let voteStateByEventId = {};
+let voteStateByEventId = loadStoredVoteState();
 const raceDetailsCache = new Map();
 const HERO_TRACK_BACKGROUNDS = {
   monza: "./assets/tracks/monza.jpg",
@@ -862,9 +907,9 @@ async function loadJson(url) {
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
   return response.json();
 }
-async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = window.setTimeout(() => controller.abort("timeout"), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -980,35 +1025,32 @@ function getVoteState(item) {
 }
 async function loadVotesForSchedule(items) {
   if (!votesApiBase) {
-    console.warn('[VOTES] API не настроена в meta tag');
     votesEnabled = false;
     votesLoaded = false;
     voteStateByEventId = {};
     return;
   }
   const eventIds = items.filter(item => !isVotingDisabledForItem(item)).map(buildSlotEventId).filter(Boolean);
-  console.log('[VOTES] Loading votes for event_ids:', eventIds, 'voter_id:', getBrowserVoterId());
   if (!eventIds.length) return;
   try {
     const url = new URL("/votes", votesApiBase);
     url.searchParams.set("event_ids", eventIds.join(","));
     url.searchParams.set("voter_id", getBrowserVoterId());
-    console.log('[VOTES] GET запрос к:', url.toString());
     const response = await fetchWithTimeout(url, { cache: "no-store" });
     if (!response.ok) {
-      console.error('[VOTES] HTTP error:', response.status, response.statusText);
       throw new Error(`HTTP ${response.status}`);
     }
     const payload = await response.json();
-    console.log('[VOTES] Получены голоса:', payload);
     if (payload?.items && typeof payload.items === "object") {
       voteStateByEventId = { ...voteStateByEventId, ...payload.items };
       votesEnabled = true;
       votesLoaded = true;
+      saveStoredVoteState(voteStateByEventId);
     }
   } catch (error) {
-    console.error('[VOTES] Ошибка при загрузке голосов:', error);
-    console.error('[VOTES] votesApiBase:', votesApiBase);
+    if (error?.name !== "AbortError") {
+      console.warn("hourly votes are unavailable.", error);
+    }
     votesEnabled = Boolean(votesApiBase);
   }
 }
@@ -1016,7 +1058,6 @@ async function submitVote(item) {
   if (!votesApiBase) return;
   const eventId = buildSlotEventId(item);
   if (!eventId || pendingVoteEventIds.has(eventId) || voteStateByEventId[eventId]?.already_voted) return;
-  console.log('[VOTE] Отправляем голос для:', eventId);
   pendingVoteEventIds.add(eventId);
   renderScheduleTable(scheduleItems);
   try {
@@ -1028,25 +1069,23 @@ async function submitVote(item) {
       time: item?.start_time_local || "",
       voter_id: voterId
     };
-    console.log('[VOTE] Отправляем:', body);
     const response = await fetch(new URL("/vote", votesApiBase), {
       method: "POST",
       headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify(body)
     });
     if (!response.ok) {
-      console.error('[VOTE] HTTP error:', response.status);
       throw new Error(`HTTP ${response.status}`);
     }
     const payload = await response.json();
-    console.log('[VOTE] Ответ:', payload);
     voteStateByEventId[eventId] = {
       event_id: eventId,
       votes: typeof payload?.votes === "number" ? payload.votes : 0,
       already_voted: Boolean(payload?.already_voted)
     };
+    saveStoredVoteState(voteStateByEventId);
   } catch (error) {
-    console.error('[VOTE] Ошибка:', error);
+    console.warn("hourly vote failed.", error);
     voteStateByEventId[eventId] = {
       ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false }),
       failed: true
@@ -1083,8 +1122,9 @@ async function submitUnvote(item) {
       votes: typeof payload?.votes === "number" ? payload.votes : 0,
       already_voted: Boolean(payload?.already_voted)
     };
+    saveStoredVoteState(voteStateByEventId);
   } catch (error) {
-    console.error(error);
+    console.warn("hourly unvote failed.", error);
     voteStateByEventId[eventId] = {
       ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false }),
       failed: true

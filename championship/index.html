@@ -113,8 +113,22 @@
       <button class="championship-lightbox-close" id="championship-lightbox-close" type="button" aria-label="Close">x</button>
       <img id="championship-lightbox-image" src="" alt="" />
     </div>
+
+    <div class="modal-overlay" id="schedule-modal" aria-hidden="true">
+      <div class="modal-card modal-card-slot" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
+        <button class="modal-close" id="schedule-modal-close" type="button" aria-label="Close" data-i18n-aria-label="closeLabel">x</button>
+        <div class="modal-header">
+          <div>
+            <div class="eyebrow" data-i18n="championshipEvent">Championship Event</div>
+            <h3 id="schedule-modal-title" class="modal-title">--</h3>
+            <p id="schedule-modal-subtitle" class="modal-subtitle">--</p>
+          </div>
+        </div>
+        <div class="schedule-modal-details" id="schedule-modal-details"></div>
+      </div>
+    </div>
   </main>
 
-  <script src="./app.js?v=20260603datafallback1" defer></script>
+  <script src="./app.js?v=20260603eventmodal1" defer></script>
 </body>
 </html>

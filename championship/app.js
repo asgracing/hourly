@@ -45,6 +45,12 @@ const translations = {
     upcoming: "upcoming races",
     drivers: "drivers scored",
     status: "status",
+    dateTime: "Date & time",
+    track: "Track",
+    weather: "Weather",
+    format: "Format",
+    conditions: "Conditions",
+    closeLabel: "Close",
     position: "Position",
     driver: "Full name",
     total: "Total points",
@@ -88,6 +94,12 @@ const translations = {
     upcoming: "гонок впереди",
     drivers: "пилотов в таблице",
     status: "статус",
+    dateTime: "Дата и время",
+    track: "Трасса",
+    weather: "Погода",
+    format: "Формат",
+    conditions: "Условия",
+    closeLabel: "Закрыть",
     position: "Позиция",
     driver: "Имя фамилия",
     total: "Итого очков",
@@ -111,6 +123,8 @@ const TRACK_BACKGROUNDS = {
   spa: "../assets/tracks/spa.jpg",
   nurburgring: "../assets/tracks/nurburgring.jpg"
 };
+let championshipUpcomingItems = [];
+let selectedScheduleItem = null;
 
 function t(key) {
   return translations[currentLang]?.[key] ?? translations.en[key] ?? key;
@@ -226,10 +240,37 @@ function normalizeUpcoming(data, schedule, slug) {
   const source = Array.isArray(data?.upcoming_races) && data.upcoming_races.length
     ? data.upcoming_races
     : (Array.isArray(schedule?.items) ? schedule.items : []);
+  const scheduleByEventId = new Map(
+    (Array.isArray(schedule?.items) ? schedule.items : [])
+      .filter(item => item?.event_id)
+      .map(item => [item.event_id, item])
+  );
   return source
     .filter(isChampionshipEvent)
     .filter(item => !slug || !item?.championship_slug || item.championship_slug === slug)
+    .map(item => {
+      const scheduleItem = item?.event_id ? scheduleByEventId.get(item.event_id) : null;
+      return scheduleItem ? { ...item, ...scheduleItem } : item;
+    })
     .slice(0, 6);
+}
+
+function compactJoin(values, separator = " · ") {
+  return values.filter(value => value !== null && value !== undefined && String(value).trim()).join(separator);
+}
+
+function buildWeatherDetails(weather) {
+  const rain = percentValue(weather?.rain_level);
+  const clouds = percentValue(weather?.cloud_level);
+  const temp = typeof weather?.ambient_temp_c === "number" ? `${Math.round(weather.ambient_temp_c)}C` : "";
+  const randomness = weather?.weather_randomness != null ? `${weather.weather_randomness}` : "";
+  return compactJoin([
+    weatherLabel(weather || {}),
+    temp,
+    clouds !== null ? `${clouds}% clouds` : "",
+    rain !== null ? `${rain}% rain` : "",
+    randomness ? `random ${randomness}` : ""
+  ]);
 }
 
 function renderProgress(data, races, upcoming, standings) {
@@ -285,11 +326,16 @@ function renderUpcoming(items, standings) {
     root.innerHTML = `<div class="championship-empty">${esc(t("noUpcoming"))}</div>`;
     return;
   }
-  root.innerHTML = upcoming.map(item => {
+  championshipUpcomingItems = upcoming;
+  root.innerHTML = upcoming.map((item, index) => {
     const backgroundUrl = resolveTrackBackground(item);
     return `
       <article
-        class="schedule-event-card is-championship-event"
+        class="schedule-event-card is-championship-event is-interactive-row"
+        data-schedule-index="${index}"
+        tabindex="0"
+        role="button"
+        aria-label="${esc(`${t("championshipEvent")}: ${getLocalizedField(item, "track_name", item.track_code || t("unknown"))}`)}"
         style="--schedule-track-photo: ${backgroundUrl ? `url('${esc(backgroundUrl)}')` : "none"};"
       >
         <div class="schedule-event-card-inner">
@@ -301,6 +347,97 @@ function renderUpcoming(items, standings) {
       </article>
     `;
   }).join("");
+  root.querySelectorAll(".schedule-event-card[data-schedule-index]").forEach(card => {
+    const openCard = () => openScheduleModal(championshipUpcomingItems[Number(card.dataset.scheduleIndex)] || null);
+    card.addEventListener("click", openCard);
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openCard();
+      }
+    });
+  });
+}
+
+function buildScheduleModalDetails(item) {
+  const weather = item?.weather || {};
+  const format = compactJoin([item?.slot_label, item?.status, item?.event_id]);
+  return `
+    <div class="schedule-modal-hero championship-slot-modal-grid">
+      <section class="hero-server-card schedule-modal-hero-pane">
+        <div class="hero-server-grid hero-server-grid-major">
+          <div class="hero-server-item">
+            <div class="label">${esc(t("dateTime"))}</div>
+            <div class="value">${esc(formatSlotDateTime(item))}</div>
+          </div>
+          <div class="hero-server-item">
+            <div class="label">${esc(t("track"))}</div>
+            <div class="value">${esc(getLocalizedField(item, "track_name", item?.track_code || t("unknown")))}</div>
+          </div>
+          <div class="hero-server-item hero-announcement-weather has-token-value">
+            <div class="label">${esc(t("weather"))}</div>
+            <div class="value">${esc(buildWeatherDetails(weather) || t("unknown"))}</div>
+          </div>
+        </div>
+      </section>
+      <aside class="hero-announcement-card schedule-modal-hero-pane">
+        <div class="event-type-badge">${esc(t("championshipEvent"))}</div>
+        <div class="hero-server-item">
+          <div class="label">${esc(t("format"))}</div>
+          <div class="value">${esc(format || t("unknown"))}</div>
+        </div>
+        <div class="hero-server-item">
+          <div class="label">${esc(t("conditions"))}</div>
+          <div class="value">${esc(compactJoin([item?.badge_label, item?.championship_slug]) || t("unknown"))}</div>
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+function applyScheduleModalTrackBackground(trackCode) {
+  const modalCard = document.querySelector("#schedule-modal .modal-card-slot");
+  if (!modalCard) return;
+  const backgroundUrl = TRACK_BACKGROUNDS[String(trackCode || "").trim().toLowerCase()];
+  modalCard.style.setProperty("--modal-track-photo", backgroundUrl ? `url("${backgroundUrl}")` : "none");
+}
+
+function renderScheduleModal() {
+  const titleEl = document.getElementById("schedule-modal-title");
+  const subtitleEl = document.getElementById("schedule-modal-subtitle");
+  const detailsEl = document.getElementById("schedule-modal-details");
+  if (!titleEl || !subtitleEl || !detailsEl) return;
+  if (!selectedScheduleItem) {
+    applyScheduleModalTrackBackground("");
+    titleEl.textContent = "-";
+    subtitleEl.textContent = "-";
+    detailsEl.innerHTML = "";
+    return;
+  }
+  applyScheduleModalTrackBackground(selectedScheduleItem.track_code);
+  titleEl.textContent = getLocalizedField(selectedScheduleItem, "track_name", selectedScheduleItem.track_code || t("unknown"));
+  subtitleEl.textContent = formatSlotDateTime(selectedScheduleItem);
+  detailsEl.innerHTML = buildScheduleModalDetails(selectedScheduleItem);
+}
+
+function openScheduleModal(item) {
+  const modal = document.getElementById("schedule-modal");
+  if (!modal || !item) return;
+  selectedScheduleItem = item;
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  renderScheduleModal();
+}
+
+function closeScheduleModal() {
+  const modal = document.getElementById("schedule-modal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  selectedScheduleItem = null;
+  applyScheduleModalTrackBackground("");
 }
 
 function normalizePrizeItems(prizes) {
@@ -579,6 +716,18 @@ function bindLightbox() {
   });
 }
 
+function bindScheduleModal() {
+  const modal = document.getElementById("schedule-modal");
+  const closeButton = document.getElementById("schedule-modal-close");
+  closeButton?.addEventListener("click", closeScheduleModal);
+  modal?.addEventListener("click", event => {
+    if (event.target === modal) closeScheduleModal();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeScheduleModal();
+  });
+}
+
 async function init() {
   applyTranslations();
   bindTopNavMoreMenu();
@@ -638,5 +787,6 @@ async function init() {
 
 document.addEventListener("DOMContentLoaded", () => {
   bindLightbox();
+  bindScheduleModal();
   init();
 });

@@ -62,6 +62,38 @@ const translations = {
     weatherMixed: "Mixed clouds",
     weatherCloudy: "Cloudy",
     weatherWet: "Wet risk",
+    weatherTemp: "{value}C",
+    weatherTempHintTitle: "Ambient temperature",
+    weatherTempHintBody: "Air temperature around the session start: {value}C. It affects tyre warm-up and overall grip.",
+    weatherCloudsHintTitle: "Cloud cover",
+    weatherCloudsHintBody: "{value}% cloud cover expected for this slot. More clouds usually mean a cooler, flatter track.",
+    weatherRainHintTitle: "Rain chance",
+    weatherRainHintBody: "{value}% rain probability for this slot. Higher values mean a greater chance of wet conditions.",
+    weatherRandomHintTitle: "Weather randomness",
+    weatherRandomHintBody: "Randomness level {value}. Higher values make the weather less predictable during the event.",
+    heroServerLabel: "Server",
+    heroPasswordLabel: "Password",
+    heroPitstopLabel: "Pitstop",
+    heroRefuelLabel: "Refuel",
+    heroTyresLabel: "Tyres",
+    labelDate: "Date",
+    labelTime: "Time",
+    entrySlots: "{value} slots",
+    entrySafety: "SA {value}+",
+    entryTrackMedals: "Track medals {value}",
+    entryRacecraft: "RC {value}+",
+    pitWindow: "window {value}m",
+    pitNone: "No mandatory pitstop",
+    pitMandatory: "{value} mandatory",
+    pitRefuelAllowed: "refuelling allowed",
+    pitRefuelFixed: "fixed refuel time",
+    refuelMandatory: "mandatory refuel",
+    refuelNone: "no refuel rules",
+    tyresMandatory: "mandatory tyre change",
+    tyresSets: "{value} sets",
+    tyresNone: "no tyre rules",
+    passwordNone: "No password",
+    eventDetailsLink: "Open event details",
     unknown: "--"
   },
   ru: {
@@ -111,6 +143,38 @@ const translations = {
     weatherMixed: "Переменная облачность",
     weatherCloudy: "Облачно",
     weatherWet: "Есть риск дождя",
+    weatherTemp: "{value}C",
+    weatherTempHintTitle: "Температура воздуха",
+    weatherTempHintBody: "Температура воздуха к началу сессии: {value}C. Она влияет на прогрев шин и общий уровень сцепления.",
+    weatherCloudsHintTitle: "Облачность",
+    weatherCloudsHintBody: "Ожидаемая облачность для этого слота: {value}%. Чем ее больше, тем прохладнее и ровнее покрытие.",
+    weatherRainHintTitle: "Вероятность дождя",
+    weatherRainHintBody: "Вероятность дождя для этого слота: {value}%. Чем выше значение, тем больше шанс влажной трассы.",
+    weatherRandomHintTitle: "Рандомность погоды",
+    weatherRandomHintBody: "Уровень рандомности: {value}. Чем он выше, тем менее предсказуемой будет погода по ходу ивента.",
+    heroServerLabel: "Сервер",
+    heroPasswordLabel: "Пароль",
+    heroPitstopLabel: "Пит-стоп",
+    heroRefuelLabel: "Заправка",
+    heroTyresLabel: "Шины",
+    labelDate: "Дата",
+    labelTime: "Время",
+    entrySlots: "{value} слотов",
+    entrySafety: "SA {value}+",
+    entryTrackMedals: "Медали трассы {value}",
+    entryRacecraft: "RC {value}+",
+    pitWindow: "окно {value}м",
+    pitNone: "Без обязательного пит-стопа",
+    pitMandatory: "{value} обязат.",
+    pitRefuelAllowed: "дозаправка разрешена",
+    pitRefuelFixed: "фикс. время дозаправки",
+    refuelMandatory: "обязат. дозаправка",
+    refuelNone: "без правил по заправке",
+    tyresMandatory: "обязат. смена шин",
+    tyresSets: "{value} компл.",
+    tyresNone: "без правил по шинам",
+    passwordNone: "Без пароля",
+    eventDetailsLink: "Открыть детали события",
     unknown: "--"
   }
 };
@@ -123,11 +187,23 @@ const TRACK_BACKGROUNDS = {
   spa: "../assets/tracks/spa.jpg",
   nurburgring: "../assets/tracks/nurburgring.jpg"
 };
+const WEATHER_ICON_PATHS = {
+  clouds: "../assets/weather/cloudness.png",
+  rain: "../assets/weather/rain.png",
+  random: "../assets/weather/random.png"
+};
+let championshipAnnouncementData = {};
 let championshipUpcomingItems = [];
 let selectedScheduleItem = null;
 
 function t(key) {
   return translations[currentLang]?.[key] ?? translations.en[key] ?? key;
+}
+
+function tf(key, replacements = {}) {
+  return Object.entries(replacements).reduce((text, [name, value]) => (
+    text.replaceAll(`{${name}}`, String(value))
+  ), t(key));
 }
 
 function esc(value) {
@@ -273,6 +349,118 @@ function buildWeatherDetails(weather) {
   ]);
 }
 
+function createHeroToken(label, tone = "default", icon = "", tooltipTitle = "", tooltipBody = "") {
+  return { label, tone, icon, tooltipTitle, tooltipBody };
+}
+
+function renderHeroTokenGroups(groups) {
+  const tokens = (groups || []).flatMap(group => (group || []).filter(token => token && token.label));
+  const normalizedTokens = tokens.length ? tokens : [createHeroToken(t("unknown"), "muted")];
+  return `<div class="hero-token-list">${normalizedTokens.map(token => {
+    const hasTooltip = token.tooltipTitle || token.tooltipBody;
+    return `<span class="hero-token hero-token-${esc(token.tone || "default")}${hasTooltip ? " hero-token-has-tooltip" : ""}"${hasTooltip ? ' tabindex="0"' : ""}>${token.icon ? `<img class="hero-token-icon" src="${esc(token.icon)}" alt="" aria-hidden="true" />` : ""}<span class="hero-token-text">${esc(token.label)}</span>${hasTooltip ? `<span class="hero-token-tooltip" role="tooltip">${token.icon ? `<img class="hero-token-tooltip-icon" src="${esc(token.icon)}" alt="" aria-hidden="true" />` : ""}<span class="hero-token-tooltip-copy"><span class="hero-token-tooltip-title">${esc(token.tooltipTitle || token.label)}</span>${token.tooltipBody ? `<span class="hero-token-tooltip-body">${esc(token.tooltipBody)}</span>` : ""}</span></span>` : ""}</span>`;
+  }).join("")}</div>`;
+}
+
+function formatMandatoryPitstopCount(value) {
+  const count = Number(value || 0);
+  return count > 0 ? tf("pitMandatory", { value: count }) : t("pitNone");
+}
+
+function buildEntryTokenGroups(server) {
+  if (!server || typeof server !== "object") return [];
+  const tokens = [];
+  if (server.car_group) tokens.push(createHeroToken(server.car_group, "primary"));
+  if (typeof server.max_car_slots === "number" && server.max_car_slots > 0) tokens.push(createHeroToken(tf("entrySlots", { value: server.max_car_slots }), "default"));
+  if (typeof server.safety_rating_requirement === "number" && server.safety_rating_requirement > 0) tokens.push(createHeroToken(tf("entrySafety", { value: server.safety_rating_requirement }), "muted"));
+  if (typeof server.track_medals_requirement === "number" && server.track_medals_requirement > 0) tokens.push(createHeroToken(tf("entryTrackMedals", { value: server.track_medals_requirement }), "muted"));
+  if (typeof server.racecraft_rating_requirement === "number" && server.racecraft_rating_requirement > 0) tokens.push(createHeroToken(tf("entryRacecraft", { value: server.racecraft_rating_requirement }), "muted"));
+  return [tokens];
+}
+
+function buildRaceFormatTokenGroups(session) {
+  if (!session || typeof session !== "object") return [];
+  const primary = [];
+  if (typeof session.qualifying_duration_minutes === "number" && session.qualifying_duration_minutes > 0) primary.push(createHeroToken(`Q ${session.qualifying_duration_minutes}m`, "primary"));
+  if (typeof session.race_duration_minutes === "number" && session.race_duration_minutes > 0) primary.push(createHeroToken(`R ${session.race_duration_minutes}m`, "primary"));
+  if (!primary.length && session.format_label) {
+    session.format_label.split(" + ").map(part => part.trim()).filter(Boolean).forEach(part => primary.push(createHeroToken(part, "primary")));
+  }
+  return [primary];
+}
+
+function buildPitstopTokenGroups(rules) {
+  if (!rules || typeof rules !== "object") return [];
+  const primary = [createHeroToken(formatMandatoryPitstopCount(rules.mandatory_pitstop_count), rules.mandatory_pitstop_count > 0 ? "primary" : "muted")];
+  const secondary = [];
+  if (typeof rules.pit_window_length_minutes === "number" && rules.pit_window_length_minutes > 0) secondary.push(createHeroToken(tf("pitWindow", { value: rules.pit_window_length_minutes }), "default"));
+  return [primary, secondary];
+}
+
+function buildRefuelTokenGroups(rules) {
+  if (!rules || typeof rules !== "object") return [];
+  const primary = [];
+  if (rules.refuelling_allowed_in_race) primary.push(createHeroToken(t("pitRefuelAllowed"), "default"));
+  if (rules.refuelling_time_fixed) primary.push(createHeroToken(t("pitRefuelFixed"), "muted"));
+  if (rules.mandatory_pitstop_refuelling_required) primary.push(createHeroToken(t("refuelMandatory"), "primary"));
+  if (!primary.length) primary.push(createHeroToken(t("refuelNone"), "muted"));
+  return [primary];
+}
+
+function buildTyreTokenGroups(rules) {
+  if (!rules || typeof rules !== "object") return [];
+  const primary = [];
+  if (rules.mandatory_pitstop_tyre_change_required) primary.push(createHeroToken(t("tyresMandatory"), "primary"));
+  if (typeof rules.tyre_set_count === "number" && rules.tyre_set_count > 0) primary.push(createHeroToken(tf("tyresSets", { value: rules.tyre_set_count }), "muted"));
+  if (!primary.length) primary.push(createHeroToken(t("tyresNone"), "muted"));
+  return [primary];
+}
+
+function buildWeatherTokenGroups(weather) {
+  if (!weather || typeof weather !== "object") return [];
+  const primary = [];
+  const secondary = [];
+  if (typeof weather.ambient_temp_c === "number") {
+    primary.push(createHeroToken(
+      tf("weatherTemp", { value: weather.ambient_temp_c }),
+      "default",
+      "",
+      t("weatherTempHintTitle"),
+      tf("weatherTempHintBody", { value: weather.ambient_temp_c })
+    ));
+  }
+  const cloudPercent = percentValue(weather.cloud_level);
+  if (cloudPercent !== null) {
+    secondary.push(createHeroToken(
+      `${cloudPercent}%`,
+      "muted",
+      WEATHER_ICON_PATHS.clouds,
+      t("weatherCloudsHintTitle"),
+      tf("weatherCloudsHintBody", { value: cloudPercent })
+    ));
+  }
+  const rainPercent = percentValue(weather.rain_level);
+  if (rainPercent !== null) {
+    secondary.push(createHeroToken(
+      `${rainPercent}%`,
+      rainPercent > 15 ? "primary" : "muted",
+      WEATHER_ICON_PATHS.rain,
+      t("weatherRainHintTitle"),
+      tf("weatherRainHintBody", { value: rainPercent })
+    ));
+  }
+  if (weather.weather_randomness !== null && weather.weather_randomness !== undefined) {
+    secondary.push(createHeroToken(
+      String(weather.weather_randomness),
+      "muted",
+      WEATHER_ICON_PATHS.random,
+      t("weatherRandomHintTitle"),
+      tf("weatherRandomHintBody", { value: weather.weather_randomness })
+    ));
+  }
+  return [primary, secondary];
+}
+
 function renderProgress(data, races, upcoming, standings) {
   const root = document.getElementById("championship-progress");
   if (!root) return;
@@ -360,37 +548,45 @@ function renderUpcoming(items, standings) {
 }
 
 function buildScheduleModalDetails(item) {
-  const weather = item?.weather || {};
-  const format = compactJoin([item?.slot_label, item?.status, item?.event_id]);
+  const server = championshipAnnouncementData?.server || {};
+  const session = championshipAnnouncementData?.session || {};
+  const rules = championshipAnnouncementData?.rules || {};
+  const weather = item?.weather || championshipAnnouncementData?.weather || {};
+  const detailsUrl = item?.details_url ? String(item.details_url) : "";
   return `
-    <div class="schedule-modal-hero championship-slot-modal-grid">
+    <div class="schedule-modal-hero">
       <section class="hero-server-card schedule-modal-hero-pane">
-        <div class="hero-server-grid hero-server-grid-major">
-          <div class="hero-server-item">
-            <div class="label">${esc(t("dateTime"))}</div>
-            <div class="value">${esc(formatSlotDateTime(item))}</div>
-          </div>
-          <div class="hero-server-item">
-            <div class="label">${esc(t("track"))}</div>
-            <div class="value">${esc(getLocalizedField(item, "track_name", item?.track_code || t("unknown")))}</div>
-          </div>
-          <div class="hero-server-item hero-announcement-weather has-token-value">
-            <div class="label">${esc(t("weather"))}</div>
-            <div class="value">${esc(buildWeatherDetails(weather) || t("unknown"))}</div>
+        <div class="hero-server-stack">
+          <div class="hero-server-grid hero-server-grid-rules">
+            <div class="hero-server-item">
+              <div class="label">${esc(t("heroPitstopLabel"))}</div>
+              <div class="value">${renderHeroTokenGroups(buildPitstopTokenGroups(rules))}</div>
+            </div>
+            <div class="hero-server-item">
+              <div class="label">${esc(t("heroRefuelLabel"))}</div>
+              <div class="value">${renderHeroTokenGroups(buildRefuelTokenGroups(rules))}</div>
+            </div>
+            <div class="hero-server-item">
+              <div class="label">${esc(t("heroTyresLabel"))}</div>
+              <div class="value">${renderHeroTokenGroups(buildTyreTokenGroups(rules))}</div>
+            </div>
           </div>
         </div>
       </section>
       <aside class="hero-announcement-card schedule-modal-hero-pane">
-        <div class="event-type-badge">${esc(t("championshipEvent"))}</div>
-        <div class="hero-server-item">
-          <div class="label">${esc(t("format"))}</div>
-          <div class="value">${esc(format || t("unknown"))}</div>
+        <div class="hero-announcement-inline-meta">
+          <div class="stat hero-announcement-inline-stat hero-announcement-inline-stat-combined">
+            <div class="value">${renderHeroTokenGroups(buildEntryTokenGroups(server))}</div>
+            <div class="hero-announcement-inline-divider" aria-hidden="true"></div>
+            <div class="value">${renderHeroTokenGroups(buildRaceFormatTokenGroups(session))}</div>
+          </div>
         </div>
-        <div class="hero-server-item">
-          <div class="label">${esc(t("conditions"))}</div>
-          <div class="value">${esc(compactJoin([item?.badge_label, item?.championship_slug]) || t("unknown"))}</div>
+        <div class="hero-announcement-weather has-token-value">
+          <div class="label">${esc(t("weather"))}</div>
+          <div class="value">${renderHeroTokenGroups(buildWeatherTokenGroups(weather))}</div>
         </div>
       </aside>
+      ${detailsUrl ? `<a class="event-details-link" href="${esc(detailsUrl)}">${esc(t("eventDetailsLink"))}</a>` : ""}
     </div>
   `;
 }
@@ -416,7 +612,25 @@ function renderScheduleModal() {
   }
   applyScheduleModalTrackBackground(selectedScheduleItem.track_code);
   titleEl.textContent = getLocalizedField(selectedScheduleItem, "track_name", selectedScheduleItem.track_code || t("unknown"));
-  subtitleEl.textContent = formatSlotDateTime(selectedScheduleItem);
+  const server = championshipAnnouncementData?.server || {};
+  const startTime = getLocalizedField(selectedScheduleItem, "start_time_local", selectedScheduleItem?.start_time_local || "--");
+  const timezone = getLocalizedField(selectedScheduleItem, "timezone", selectedScheduleItem?.timezone || "UTC+3");
+  subtitleEl.innerHTML = `
+    <span class="schedule-modal-subtitle-grid">
+      <span class="schedule-modal-subtitle-card">
+        <span class="schedule-modal-subtitle-label">${esc(t("heroServerLabel"))}</span>
+        <span class="schedule-modal-subtitle-value">${esc(server.name || server.full_name || t("unknown"))}</span>
+      </span>
+      <span class="schedule-modal-subtitle-card">
+        <span class="schedule-modal-subtitle-label">${esc(t("heroPasswordLabel"))}</span>
+        <span class="schedule-modal-subtitle-value">${esc(server.password || t("passwordNone"))}</span>
+      </span>
+      <span class="schedule-modal-subtitle-card">
+        <span class="schedule-modal-subtitle-label">${esc(`${t("labelDate")} + ${t("labelTime")}`)}</span>
+        <span class="schedule-modal-subtitle-value">${esc(formatSlotDateTime(selectedScheduleItem)).replace(" · ", "<br>")}</span>
+      </span>
+    </span>
+  `;
   detailsEl.innerHTML = buildScheduleModalDetails(selectedScheduleItem);
 }
 
@@ -743,6 +957,7 @@ async function init() {
       loadJson(`${dataBase}/announcement.json`),
       loadJson(`${dataBase}/schedule.json`)
     ]);
+    championshipAnnouncementData = announcement || {};
     const firstChampionship = (schedule?.items || []).find(isChampionshipEvent);
     const slug = params.get("slug")
       || announcement?.championship_slug

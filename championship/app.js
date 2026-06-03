@@ -591,10 +591,12 @@ function buildScheduleModalDetails(item) {
   `;
 }
 
-function applyScheduleModalTrackBackground(trackCode) {
+function applyScheduleModalTrackBackground(itemOrTrackCode) {
   const modalCard = document.querySelector("#schedule-modal .modal-card-slot");
   if (!modalCard) return;
-  const backgroundUrl = TRACK_BACKGROUNDS[String(trackCode || "").trim().toLowerCase()];
+  const backgroundUrl = itemOrTrackCode && typeof itemOrTrackCode === "object"
+    ? resolveTrackBackground(itemOrTrackCode)
+    : TRACK_BACKGROUNDS[String(itemOrTrackCode || "").trim().toLowerCase()];
   modalCard.style.setProperty("--modal-track-photo", backgroundUrl ? `url("${backgroundUrl}")` : "none");
 }
 
@@ -610,7 +612,7 @@ function renderScheduleModal() {
     detailsEl.innerHTML = "";
     return;
   }
-  applyScheduleModalTrackBackground(selectedScheduleItem.track_code);
+  applyScheduleModalTrackBackground(selectedScheduleItem);
   titleEl.textContent = getLocalizedField(selectedScheduleItem, "track_name", selectedScheduleItem.track_code || t("unknown"));
   const server = championshipAnnouncementData?.server || {};
   const startTime = getLocalizedField(selectedScheduleItem, "start_time_local", selectedScheduleItem?.start_time_local || "--");

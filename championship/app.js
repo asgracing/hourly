@@ -12,6 +12,7 @@ const defaultDataBase = isAsgPublicSite
     : "/hourly-data";
 const dataBase = normalizeBaseUrl(params.get("hourlyApiBase")) || defaultDataBase;
 const githubDataBase = "https://asgracing.github.io/hourly-data";
+const hourlyAssetBase = "https://asgracing.github.io/hourly/assets";
 let currentLang = localStorage.getItem("asgLang") || (((navigator.language || "").toLowerCase().startsWith("ru")) ? "ru" : "en");
 
 const translations = {
@@ -180,17 +181,17 @@ const translations = {
 };
 
 const TRACK_BACKGROUNDS = {
-  monza: "../assets/tracks/monza.jpg",
-  monzatg: "../assets/tracks/monzaTG.jpg",
-  "monza-tg": "../assets/tracks/monzaTG.jpg",
-  silverstone: "../assets/tracks/silverstone.jpg",
-  spa: "../assets/tracks/spa.jpg",
-  nurburgring: "../assets/tracks/nurburgring.jpg"
+  monza: `${hourlyAssetBase}/tracks/monza.jpg`,
+  monzatg: `${hourlyAssetBase}/tracks/monzaTG.jpg`,
+  "monza-tg": `${hourlyAssetBase}/tracks/monzaTG.jpg`,
+  silverstone: `${hourlyAssetBase}/tracks/silverstone.jpg`,
+  spa: `${hourlyAssetBase}/tracks/spa.jpg`,
+  nurburgring: `${hourlyAssetBase}/tracks/nurburgring.jpg`
 };
 const WEATHER_ICON_PATHS = {
-  clouds: "../assets/weather/cloudness.png",
-  rain: "../assets/weather/rain.png",
-  random: "../assets/weather/random.png"
+  clouds: `${hourlyAssetBase}/weather/cloudness.png`,
+  rain: `${hourlyAssetBase}/weather/rain.png`,
+  random: `${hourlyAssetBase}/weather/random.png`
 };
 let championshipAnnouncementData = {};
 let championshipUpcomingItems = [];
@@ -250,13 +251,19 @@ function getLocalizedDescription(...sources) {
   return "";
 }
 
+function resolveHourlyAssetUrl(value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+  if (/^(https?:)?\/\//i.test(rawValue)) return rawValue;
+  if (rawValue.startsWith("/hourly/assets/")) return `https://asgracing.github.io${rawValue}`;
+  if (rawValue.startsWith("/")) return rawValue;
+  const assetPath = rawValue.replace(/^(\.\.\/|\.\/)?assets\//, "").replace(/^\.?\//, "");
+  return `${hourlyAssetBase}/${assetPath}`;
+}
+
 function resolveTrackBackground(item) {
   const directValue = item?.track_image || item?.track_photo || item?.background_image || item?.image;
-  if (directValue) {
-    const value = String(directValue).trim();
-    if (/^(https?:)?\/\//i.test(value) || value.startsWith("/") || value.startsWith("../")) return value;
-    return `../${value.replace(/^\.?\//, "")}`;
-  }
+  if (directValue) return resolveHourlyAssetUrl(directValue);
   const trackCode = String(item?.track_code || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
   return TRACK_BACKGROUNDS[trackCode] || TRACK_BACKGROUNDS[trackCode.replace(/-/g, "")] || "";
 }
@@ -530,7 +537,7 @@ function renderUpcoming(items, standings) {
           <div class="event-type-badge">${esc(t("championshipEvent"))}</div>
           <div class="schedule-event-time">${esc(formatSlotDateTime(item))}</div>
           <div class="schedule-event-track">${esc(getLocalizedField(item, "track_name", item.track_code || "--"))}</div>
-          <div class="schedule-event-weather"><span>${esc(weatherLabel(item.weather || {}))}</span><img src="../assets/weather/rain.png" alt="" /></div>
+          <div class="schedule-event-weather"><span>${esc(weatherLabel(item.weather || {}))}</span><img src="${esc(WEATHER_ICON_PATHS.rain)}" alt="" /></div>
         </div>
       </article>
     `;

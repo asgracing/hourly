@@ -592,10 +592,14 @@ async function init() {
       status: announcement?.championship?.status || "active",
       period: announcement?.championship?.period,
       description: getLocalizedDescription(announcement?.championship, firstChampionship),
+      prizes: announcement?.championship?.prizes,
       upcoming_races: normalizeUpcoming({}, schedule, slug),
       standings: [],
       races: []
     };
+    if (!data.prizes && announcement?.championship?.prizes) {
+      data.prizes = announcement.championship.prizes;
+    }
     const upcoming = normalizeUpcoming(data, schedule, slug);
     const races = await loadRaceDetails(data, slug);
     const standings = normalizeStandings(data);

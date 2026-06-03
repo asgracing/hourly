@@ -487,6 +487,11 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
                 or (championship or {}).get("description_localized")
                 or (championship or {}).get("descriptions")
             ),
+            "prizes": (championship or {}).get("prizes") or {
+                "prize1": (championship or {}).get("prize1"),
+                "prize2": (championship or {}).get("prize2"),
+                "prize3": (championship or {}).get("prize3"),
+            },
         } if championship else None,
         "updated_at": now_local_iso(),
         **accessory_info,

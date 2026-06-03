@@ -146,6 +146,19 @@ function getLocalizedField(item, key, fallback = "--") {
   return fallback;
 }
 
+function getLocalizedDescription(...sources) {
+  for (const source of sources) {
+    const value = getLocalizedField(source, "description", "");
+    if (value && value !== "--") return value;
+    const i18n = source?.description_i18n || source?.description_localized || source?.descriptions;
+    if (i18n && typeof i18n === "object") {
+      const localized = i18n[currentLang] ?? i18n.en ?? i18n.ru;
+      if (typeof localized === "string" && localized.trim()) return localized.trim();
+    }
+  }
+  return "";
+}
+
 function resolveTrackBackground(item) {
   const directValue = item?.track_image || item?.track_photo || item?.background_image || item?.image;
   if (directValue) {
@@ -578,7 +591,7 @@ async function init() {
       title: announcement?.championship_title || announcement?.championship?.title || firstChampionship?.championship_title || "ASG Racing June 2026",
       status: announcement?.championship?.status || "active",
       period: announcement?.championship?.period,
-      description: announcement?.championship?.description || "",
+      description: getLocalizedDescription(announcement?.championship, firstChampionship),
       upcoming_races: normalizeUpcoming({}, schedule, slug),
       standings: [],
       races: []
@@ -589,7 +602,7 @@ async function init() {
 
     document.getElementById("championship-title").textContent = data.title || announcement?.championship_title || firstChampionship?.championship_title || "ASG Racing June 2026";
     document.getElementById("championship-status").textContent = [data.period, data.status].filter(Boolean).join(" · ") || t("championship");
-    document.getElementById("championship-description").textContent = data.description || t("activeChampionship");
+    document.getElementById("championship-description").textContent = getLocalizedDescription(data, announcement?.championship, firstChampionship) || t("activeChampionship");
 
     renderProgress(data, races, upcoming, standings);
     renderUpcoming(upcoming, standings);

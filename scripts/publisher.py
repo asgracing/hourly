@@ -480,6 +480,13 @@ def build_announcement(schedule_data: dict, schedule_config: dict, settings_data
             "status": (championship or {}).get("status"),
             "period": (championship or {}).get("period"),
             "description": (championship or {}).get("description"),
+            "description_ru": (championship or {}).get("description_ru"),
+            "description_en": (championship or {}).get("description_en"),
+            "description_i18n": (
+                (championship or {}).get("description_i18n")
+                or (championship or {}).get("description_localized")
+                or (championship or {}).get("descriptions")
+            ),
         } if championship else None,
         "updated_at": now_local_iso(),
         **accessory_info,
@@ -1031,7 +1038,12 @@ def active_championship_config(schedule_config: dict):
     selected = next((item for item in configs if isinstance(item, dict) and item.get("slug") == slug), None)
     if not isinstance(selected, dict):
         selected = {}
-    payload = {**selected, **{key: value for key, value in championship.items() if key not in {"items", "championships"}}}
+    shared_fields = {
+        key: value
+        for key, value in championship.items()
+        if key not in {"items", "championships"} and value not in (None, "")
+    }
+    payload = {**shared_fields, **selected}
     payload["slug"] = slug
     payload["status"] = payload.get("status") or "active"
     return payload
@@ -1093,6 +1105,13 @@ def publish_active_championship(schedule_config: dict):
         "status": championship.get("status") or "active",
         "period": championship.get("period"),
         "description": championship.get("description") or "",
+        "description_ru": championship.get("description_ru") or "",
+        "description_en": championship.get("description_en") or "",
+        "description_i18n": (
+            championship.get("description_i18n")
+            or championship.get("description_localized")
+            or championship.get("descriptions")
+        ),
         "upcoming_races": [
             item for item in planning.build_calendar_slots(schedule_config, load_json(ROTATION_STATE_PATH, default={}) or {})
             if planning.event_type_for_slot(item) == "championship"

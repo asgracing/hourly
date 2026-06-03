@@ -11,6 +11,7 @@ const defaultDataBase = isAsgPublicSite
     ? "https://asgracing.github.io/hourly-data"
     : "/hourly-data";
 const dataBase = normalizeBaseUrl(params.get("hourlyApiBase")) || defaultDataBase;
+const githubDataBase = "https://asgracing.github.io/hourly-data";
 let currentLang = localStorage.getItem("asgLang") || (((navigator.language || "").toLowerCase().startsWith("ru")) ? "ru" : "en");
 
 const translations = {
@@ -313,17 +314,17 @@ function normalizePrizeItems(prizes) {
   }).filter(Boolean);
 }
 
-function normalizeAssetUrl(path, slug) {
+function normalizeAssetUrl(path, slug, assetBase = dataBase) {
   const value = String(path || "").trim();
   if (!value) return "";
   if (/^(https?:)?\/\//i.test(value) || value.startsWith("data:")) return value;
   if (value.startsWith("/")) return value;
   if (value.startsWith("./") || value.startsWith("../")) return value;
-  if (value.startsWith("events/") || value.startsWith("assets/")) return `${dataBase}/${value}`;
-  return `${dataBase}/events/${encodeURIComponent(slug || "championship")}/${value}`;
+  if (value.startsWith("events/") || value.startsWith("assets/")) return `${assetBase}/${value}`;
+  return `${assetBase}/events/${encodeURIComponent(slug || "championship")}/${value}`;
 }
 
-function renderPrizes(prizes, slug) {
+function renderPrizes(prizes, slug, assetBase = dataBase) {
   const root = document.getElementById("championship-prizes-grid");
   if (!root) return;
   const items = normalizePrizeItems(prizes);
@@ -332,7 +333,7 @@ function renderPrizes(prizes, slug) {
     return;
   }
   root.innerHTML = items.map((item, index) => {
-    const src = normalizeAssetUrl(item.src, slug);
+    const src = normalizeAssetUrl(item.src, slug, assetBase);
     const title = item.title || `P${index + 1}`;
     const alt = item.alt || title;
     return `
@@ -429,15 +430,29 @@ function renderRaceResults(races) {
   }).join("");
 }
 
-async function loadRaceDetails(data, slug) {
+async function loadRaceDetails(data, slug, assetBase = dataBase) {
   const races = normalizeRaces(data);
   const detailed = await Promise.all(races.map(async race => {
     if (Array.isArray(race.results)) return race;
     const detailsPath = race.details_path || `races/${race.event_id}.json`;
-    const detail = await loadJsonOrNull(`${dataBase}/events/${encodeURIComponent(slug)}/${detailsPath}`);
+    const detail = await loadJsonOrNull(`${assetBase}/events/${encodeURIComponent(slug)}/${detailsPath}`);
     return detail ? { ...race, ...detail } : race;
   }));
   return detailed;
+}
+
+async function loadChampionshipData(slug) {
+  const primaryUrl = `${dataBase}/events/${encodeURIComponent(slug)}/index.json`;
+  const primaryData = await loadJsonOrNull(primaryUrl);
+  if (primaryData) return { data: primaryData, assetBase: dataBase };
+
+  if (dataBase !== githubDataBase) {
+    const githubUrl = `${githubDataBase}/events/${encodeURIComponent(slug)}/index.json`;
+    const githubData = await loadJsonOrNull(githubUrl);
+    if (githubData) return { data: githubData, assetBase: githubDataBase };
+  }
+
+  return { data: null, assetBase: dataBase };
 }
 
 function applyTranslations() {
@@ -585,7 +600,9 @@ async function init() {
       || announcement?.championship?.slug
       || firstChampionship?.championship_slug
       || "championship";
-    const loadedData = await loadJsonOrNull(`${dataBase}/events/${encodeURIComponent(slug)}/index.json`);
+    const loaded = await loadChampionshipData(slug);
+    const loadedData = loaded.data;
+    const assetBase = loaded.assetBase;
     const data = loadedData || {
       slug,
       title: announcement?.championship_title || announcement?.championship?.title || firstChampionship?.championship_title || "ASG Racing June 2026",
@@ -601,7 +618,7 @@ async function init() {
       data.prizes = announcement.championship.prizes;
     }
     const upcoming = normalizeUpcoming(data, schedule, slug);
-    const races = await loadRaceDetails(data, slug);
+    const races = await loadRaceDetails(data, slug, assetBase);
     const standings = normalizeStandings(data);
 
     document.getElementById("championship-title").textContent = data.title || announcement?.championship_title || firstChampionship?.championship_title || "ASG Racing June 2026";
@@ -610,7 +627,7 @@ async function init() {
 
     renderProgress(data, races, upcoming, standings);
     renderUpcoming(upcoming, standings);
-    renderPrizes(data.prizes, slug);
+    renderPrizes(data.prizes, slug, assetBase);
     renderStandings(data, races);
     renderRaceResults(races);
   } catch (error) {

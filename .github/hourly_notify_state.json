@@ -436,11 +436,13 @@
       }
     },
     "hourly_2026-06-04_2100": {
-      "sent": {}
+      "sent": {
+        "12_msk": "2026-06-04T10:38:30+00:00"
+      }
     }
   },
   "last_event_id": "hourly_2026-06-04_2100",
   "telegram": {
-    "last_pinned_message_id": 29469
+    "last_pinned_message_id": 29723
   }
 }

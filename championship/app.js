@@ -210,7 +210,20 @@ let votesLoaded = false;
 let voteStateByEventId = loadStoredVoteState();
 const pendingVoteEventIds = new Set();
 
+const ruVoteTranslations = {
+  voteButton: "\u042f \u0445\u043e\u0447\u0443 \u043f\u043e\u0435\u0445\u0430\u0442\u044c!",
+  voteButtonDone: "\u0422\u044b \u0432 \u0441\u043f\u0438\u0441\u043a\u0435",
+  voteCountZero: "\u041f\u043e\u043a\u0430 \u043d\u0438\u043a\u0442\u043e \u043d\u0435 \u043e\u0442\u043c\u0435\u0442\u0438\u043b\u0441\u044f",
+  voteCountOne: "{value} \u0445\u043e\u0447\u0435\u0442 \u043f\u043e\u0435\u0445\u0430\u0442\u044c",
+  voteCountMany: "{value} \u0445\u043e\u0442\u044f\u0442 \u043f\u043e\u0435\u0445\u0430\u0442\u044c",
+  voteSoon: "\u041e\u043f\u0440\u043e\u0441 \u0441\u043a\u043e\u0440\u043e",
+  voteSending: "\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c...",
+  voteFailed: "\u041f\u043e\u0432\u0442\u043e\u0440\u0438 \u043f\u043e\u0437\u0436\u0435",
+  unvoteButton: "\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c \u0433\u043e\u043b\u043e\u0441"
+};
+
 function t(key) {
+  if (currentLang === "ru" && ruVoteTranslations[key]) return ruVoteTranslations[key];
   return translations[currentLang]?.[key] ?? translations.en[key] ?? key;
 }
 

@@ -13,6 +13,7 @@ const defaultDataBase = isAsgPublicSite
 const dataBase = normalizeBaseUrl(params.get("hourlyApiBase")) || defaultDataBase;
 const githubDataBase = "https://asgracing.github.io/hourly-data";
 const hourlyAssetBase = "https://asgracing.github.io/hourly/assets";
+const votesApiBase = "https://hourly-votes.asgracing.workers.dev";
 let currentLang = localStorage.getItem("asgLang") || (((navigator.language || "").toLowerCase().startsWith("ru")) ? "ru" : "en");
 
 const translations = {
@@ -95,6 +96,15 @@ const translations = {
     tyresNone: "no tyre rules",
     passwordNone: "No password",
     eventDetailsLink: "Open event details",
+    voteButton: "I want to race!",
+    voteButtonDone: "You're in",
+    voteCountZero: "No votes yet",
+    voteCountOne: "{value} wants to race",
+    voteCountMany: "{value} want to race",
+    voteSoon: "Voting soon",
+    voteSending: "Saving...",
+    voteFailed: "Try again",
+    unvoteButton: "Remove vote",
     unknown: "--"
   },
   ru: {
@@ -196,6 +206,9 @@ const WEATHER_ICON_PATHS = {
 let championshipAnnouncementData = {};
 let championshipUpcomingItems = [];
 let selectedScheduleItem = null;
+let votesLoaded = false;
+let voteStateByEventId = loadStoredVoteState();
+const pendingVoteEventIds = new Set();
 
 function t(key) {
   return translations[currentLang]?.[key] ?? translations.en[key] ?? key;
@@ -211,6 +224,73 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 }
 
+function normalizeEventId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function canonicalizeSlotEventId(value) {
+  const normalized = normalizeEventId(value);
+  const match = normalized.match(/^hourly_(\d{4}-\d{2}-\d{2})_(\d{4})(?:_.+)?$/);
+  return match ? `hourly_${match[1]}_${match[2]}` : normalized;
+}
+
+function buildSlotEventId(item) {
+  const explicitId = canonicalizeSlotEventId(item?.event_id);
+  if (explicitId) return explicitId;
+  const date = String(item?.date || "").trim();
+  const time = String(item?.start_time_local || "").trim().replace(/[^0-9]/g, "");
+  if (!date || !time) return "";
+  return normalizeEventId(`hourly_${date}_${time}`);
+}
+
+function getBrowserVoterId() {
+  const storageKey = "hourlyVoteVoterId";
+  const existing = localStorage.getItem(storageKey);
+  if (existing) return existing;
+  const next = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  localStorage.setItem(storageKey, next);
+  return next;
+}
+
+function loadStoredVoteState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("hourlyVoteState") || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveStoredVoteState(state) {
+  try {
+    localStorage.setItem("hourlyVoteState", JSON.stringify(state || {}));
+  } catch {
+    // Ignore storage quota/privacy mode failures; the worker remains the source of truth.
+  }
+}
+
+function getVoteLabel(count) {
+  if (typeof count !== "number" || count <= 0) return t("voteCountZero");
+  return tf(count === 1 ? "voteCountOne" : "voteCountMany", { value: count });
+}
+
+function getVoteState(item) {
+  const eventId = buildSlotEventId(item);
+  return {
+    eventId,
+    pending: pendingVoteEventIds.has(eventId),
+    ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false })
+  };
+}
+
+function isVotingDisabledForItem(item) {
+  return Boolean(item?.voting_disabled);
+}
+
 async function loadJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -222,6 +302,71 @@ async function loadJsonOrNull(url) {
     return await loadJson(url);
   } catch (error) {
     return null;
+  }
+}
+
+async function loadVotesForSchedule(items) {
+  const eventIds = items.filter(item => !isVotingDisabledForItem(item)).map(buildSlotEventId).filter(Boolean);
+  if (!eventIds.length) return;
+  try {
+    const url = new URL("/votes", votesApiBase);
+    url.searchParams.set("event_ids", [...new Set(eventIds)].join(","));
+    url.searchParams.set("voter_id", getBrowserVoterId());
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload?.items && typeof payload.items === "object") {
+      voteStateByEventId = { ...voteStateByEventId, ...payload.items };
+      votesLoaded = true;
+      saveStoredVoteState(voteStateByEventId);
+    }
+  } catch (error) {
+    console.warn("championship votes are unavailable.", error);
+  }
+}
+
+async function submitVote(item) {
+  const eventId = buildSlotEventId(item);
+  if (!eventId || pendingVoteEventIds.has(eventId) || isVotingDisabledForItem(item)) return;
+  pendingVoteEventIds.add(eventId);
+  renderUpcoming(championshipUpcomingItems, []);
+  try {
+    const voteState = voteStateByEventId[eventId] || {};
+    const endpoint = voteState.already_voted ? "/unvote" : "/vote";
+    const body = voteState.already_voted
+      ? {
+          event_id: eventId,
+          voter_id: getBrowserVoterId()
+        }
+      : {
+          event_id: eventId,
+          track: getLocalizedField(item, "track_name", item?.track_name || item?.track_code || "-"),
+          date: item?.date || "",
+          time: item?.start_time_local || "",
+          voter_id: getBrowserVoterId()
+        };
+    const response = await fetch(new URL(endpoint, votesApiBase), {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    voteStateByEventId[eventId] = {
+      event_id: eventId,
+      votes: typeof payload?.votes === "number" ? payload.votes : 0,
+      already_voted: Boolean(payload?.already_voted)
+    };
+    saveStoredVoteState(voteStateByEventId);
+  } catch (error) {
+    console.warn("championship vote failed.", error);
+    voteStateByEventId[eventId] = {
+      ...(voteStateByEventId[eventId] || { votes: 0, already_voted: false }),
+      failed: true
+    };
+  } finally {
+    pendingVoteEventIds.delete(eventId);
+    renderUpcoming(championshipUpcomingItems, []);
   }
 }
 
@@ -503,6 +648,45 @@ function renderWinners(standings) {
   `).join("");
 }
 
+function renderVoteControl(item) {
+  if (isVotingDisabledForItem(item)) return "";
+  const voteState = getVoteState(item);
+  const voteCountLabel = voteState.failed
+    ? t("voteFailed")
+    : voteState.pending
+      ? t("voteSending")
+      : votesLoaded || voteStateByEventId[voteState.eventId]
+        ? getVoteLabel(voteState.votes)
+        : t("voteSoon");
+  return `
+    <div class="schedule-event-vote">
+      <div class="schedule-event-vote-actions">
+        <button
+          class="schedule-event-vote-btn${voteState.already_voted ? " is-voted" : ""}"
+          type="button"
+          data-vote-event-id="${esc(voteState.eventId)}"
+          ${voteState.pending ? "disabled" : ""}
+        >
+          <span class="schedule-event-vote-icon" aria-hidden="true">+</span>
+          <span>${esc(voteState.already_voted ? t("voteButtonDone") : t("voteButton"))}</span>
+        </button>
+        ${
+          voteState.already_voted
+            ? `<button
+                class="schedule-event-vote-cancel"
+                type="button"
+                data-vote-event-id="${esc(voteState.eventId)}"
+                aria-label="${esc(t("unvoteButton"))}"
+                ${voteState.pending ? "disabled" : ""}
+              >x</button>`
+            : ""
+        }
+      </div>
+      <div class="schedule-event-vote-meta">${esc(voteCountLabel)}</div>
+    </div>
+  `;
+}
+
 function renderUpcoming(items, standings) {
   const root = document.getElementById("championship-upcoming");
   const title = document.getElementById("championship-upcoming-title");
@@ -538,10 +722,19 @@ function renderUpcoming(items, standings) {
           <div class="schedule-event-time">${esc(formatSlotDateTime(item))}</div>
           <div class="schedule-event-track">${esc(getLocalizedField(item, "track_name", item.track_code || "--"))}</div>
           <div class="schedule-event-weather"><span>${esc(weatherLabel(item.weather || {}))}</span><img src="${esc(WEATHER_ICON_PATHS.rain)}" alt="" /></div>
+          ${renderVoteControl(item)}
         </div>
       </article>
     `;
   }).join("");
+  root.querySelectorAll("[data-vote-event-id]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      const eventId = button.dataset.voteEventId;
+      const item = championshipUpcomingItems.find(row => buildSlotEventId(row) === eventId);
+      if (item) void submitVote(item);
+    });
+  });
   root.querySelectorAll(".schedule-event-card[data-schedule-index]").forEach(card => {
     const openCard = () => openScheduleModal(championshipUpcomingItems[Number(card.dataset.scheduleIndex)] || null);
     card.addEventListener("click", openCard);
@@ -993,6 +1186,7 @@ async function init() {
     const upcoming = normalizeUpcoming(data, schedule, slug);
     const races = await loadRaceDetails(data, slug, assetBase);
     const standings = normalizeStandings(data);
+    await loadVotesForSchedule(upcoming.slice(0, 3));
 
     document.getElementById("championship-title").textContent = data.title || announcement?.championship_title || firstChampionship?.championship_title || "ASG Racing June 2026";
     document.getElementById("championship-status").textContent = [data.period, data.status].filter(Boolean).join(" · ") || t("championship");

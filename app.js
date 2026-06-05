@@ -453,7 +453,7 @@ function isChampionshipEvent(item) {
   return String(item?.event_type || item?.type || "").trim().toLowerCase() === "championship";
 }
 function isVotingDisabledForItem(item) {
-  return Boolean(item?.voting_disabled) || isChampionshipEvent(item);
+  return Boolean(item?.voting_disabled);
 }
 function eventBadgeLabel(item) {
   if (item?.badge_label) return getLocalizedField(item, "badge_label", item.badge_label);

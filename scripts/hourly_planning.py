@@ -323,7 +323,7 @@ def apply_slot_override(item: dict, override: dict | None):
         return item
     event_type = event_type_for_slot(override)
     item["event_type"] = event_type
-    item["voting_disabled"] = bool(override.get("voting_disabled", event_type == "championship"))
+    item["voting_disabled"] = bool(override.get("voting_disabled", False))
     for key in [
         "title",
         "subtitle",

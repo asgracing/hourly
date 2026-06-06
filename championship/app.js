@@ -263,9 +263,32 @@ function buildSlotEventId(item) {
 function getBrowserVoterId() {
   const storageKey = "hourlyVoteVoterId";
   const existing = localStorage.getItem(storageKey);
-  if (existing) return existing;
+  const now = Date.now();
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing);
+      if (parsed && typeof parsed.value === "string" && parsed.value.trim()) {
+        if (!parsed.expiresAt || Number(parsed.expiresAt) > now) {
+          return parsed.value.trim();
+        }
+      }
+    } catch {
+      if (existing.trim()) {
+        localStorage.setItem(storageKey, JSON.stringify({
+          value: existing.trim(),
+          createdAt: now,
+          expiresAt: now + 365 * 24 * 60 * 60 * 1000
+        }));
+        return existing.trim();
+      }
+    }
+  }
   const next = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  localStorage.setItem(storageKey, next);
+  localStorage.setItem(storageKey, JSON.stringify({
+    value: next,
+    createdAt: now,
+    expiresAt: now + 365 * 24 * 60 * 60 * 1000
+  }));
   return next;
 }
 

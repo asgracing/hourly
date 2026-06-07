@@ -263,14 +263,20 @@ async function ensureIssue(env, slot, issues = []) {
 }
 
 async function listVoteComments(env, issueNumber) {
-  const response = await githubFetch(
-    env,
-    `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issueNumber}/comments?per_page=100`,
-    {},
-    { authenticated: hasGithubToken(env) }
-  );
-  const comments = await response.json();
-  return Array.isArray(comments) ? comments : [];
+  const allComments = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await githubFetch(
+      env,
+      `/repos/${env.GITHUB_REPO_OWNER}/${env.GITHUB_REPO_NAME}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      {},
+      { authenticated: hasGithubToken(env) }
+    );
+    const comments = await response.json();
+    const batch = Array.isArray(comments) ? comments : [];
+    allComments.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return allComments;
 }
 
 function findVoteCommentByVoterId(comments, voterId) {
@@ -369,8 +375,13 @@ async function handlePostVote(request, env, origin) {
     }
     const updatedComments = await listVoteCommentsForIssues(env, dedupeIssues([...issues, issue]));
     const result = summarizeVotes(eventId, updatedComments, voterId);
+    const consistentResult = {
+      ...result,
+      votes: Math.max(result.votes, summary.votes + 1),
+      already_voted: true
+    };
     console.log(`[VOTE] Final result: votes=${result.votes}, already_voted=${result.already_voted}`);
-    return jsonResponse({ ok: true, ...result }, 200, origin);
+    return jsonResponse({ ok: true, ...consistentResult }, 200, origin);
   }
   console.log(`[VOTE] Voter already voted, returning existing summary`);
   return jsonResponse({ ok: true, ...summary }, 200, origin);
@@ -387,6 +398,8 @@ async function handlePostUnvote(request, env, origin) {
   if (!issues.length) {
     return jsonResponse({ ok: true, event_id: eventId, votes: 0, already_voted: false }, 200, origin);
   }
+  const initialComments = await listVoteCommentsForIssues(env, issues);
+  const initialSummary = summarizeVotes(eventId, initialComments, voterId);
   for (const issue of issues) {
     const comments = await listVoteComments(env, issue.number);
     const voteComments = findVoteCommentsByVoterId(comments, voterId);
@@ -400,7 +413,15 @@ async function handlePostUnvote(request, env, origin) {
     }
   }
   const updatedComments = await listVoteCommentsForIssues(env, issues);
-  return jsonResponse({ ok: true, ...summarizeVotes(eventId, updatedComments, voterId) }, 200, origin);
+  const updatedSummary = summarizeVotes(eventId, updatedComments, voterId);
+  const consistentSummary = {
+    ...updatedSummary,
+    votes: initialSummary.already_voted
+      ? Math.max(0, Math.min(updatedSummary.votes, initialSummary.votes - 1))
+      : updatedSummary.votes,
+    already_voted: false
+  };
+  return jsonResponse({ ok: true, ...consistentSummary }, 200, origin);
 }
 
 export default {

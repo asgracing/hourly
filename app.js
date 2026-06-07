@@ -124,20 +124,24 @@ function loadStoredVoteState() {
   }
 }
 
+function normalizeVoteStateItems(items) {
+  return Object.fromEntries(
+    Object.entries(items || {})
+      .filter(([eventId, state]) => eventId && state && typeof state === "object")
+      .map(([eventId, state]) => [
+        eventId,
+        {
+          event_id: state.event_id || eventId,
+          votes: typeof state.votes === "number" ? state.votes : 0,
+          already_voted: Boolean(state.already_voted)
+        }
+      ])
+  );
+}
+
 function saveStoredVoteState(items) {
   try {
-    const normalizedItems = Object.fromEntries(
-      Object.entries(items || {})
-        .filter(([eventId, state]) => eventId && state && typeof state === "object")
-        .map(([eventId, state]) => [
-          eventId,
-          {
-            event_id: state.event_id || eventId,
-            votes: typeof state.votes === "number" ? state.votes : 0,
-            already_voted: Boolean(state.already_voted)
-          }
-        ])
-    );
+    const normalizedItems = normalizeVoteStateItems(items);
     localStorage.setItem(
       VOTE_STATE_STORAGE_KEY,
       JSON.stringify({
@@ -148,6 +152,25 @@ function saveStoredVoteState(items) {
     );
   } catch (error) {
     // Vote cache is only a UI fallback; the worker remains the source of truth.
+  }
+}
+
+function mergeVoteStateItems(items) {
+  voteStateByEventId = {
+    ...voteStateByEventId,
+    ...normalizeVoteStateItems(items)
+  };
+  saveStoredVoteState(voteStateByEventId);
+}
+
+function syncVoteStateFromStorage() {
+  voteStateByEventId = loadStoredVoteState();
+  if (Array.isArray(scheduleItems) && scheduleItems.length) {
+    renderScheduleTable(scheduleItems);
+    renderHeroVote();
+  }
+  if (selectedScheduleItem && typeof renderScheduleModal === "function") {
+    renderScheduleModal();
   }
 }
 
@@ -1042,10 +1065,9 @@ async function loadVotesForSchedule(items) {
     }
     const payload = await response.json();
     if (payload?.items && typeof payload.items === "object") {
-      voteStateByEventId = { ...voteStateByEventId, ...payload.items };
+      mergeVoteStateItems(payload.items);
       votesEnabled = true;
       votesLoaded = true;
-      saveStoredVoteState(voteStateByEventId);
     }
   } catch (error) {
     if (error?.name !== "AbortError") {
@@ -1083,7 +1105,7 @@ async function submitVote(item) {
       votes: typeof payload?.votes === "number" ? payload.votes : 0,
       already_voted: Boolean(payload?.already_voted)
     };
-    saveStoredVoteState(voteStateByEventId);
+    mergeVoteStateItems({ [eventId]: voteStateByEventId[eventId] });
   } catch (error) {
     console.warn("hourly vote failed.", error);
     voteStateByEventId[eventId] = {
@@ -1122,7 +1144,7 @@ async function submitUnvote(item) {
       votes: typeof payload?.votes === "number" ? payload.votes : 0,
       already_voted: Boolean(payload?.already_voted)
     };
-    saveStoredVoteState(voteStateByEventId);
+    mergeVoteStateItems({ [eventId]: voteStateByEventId[eventId] });
   } catch (error) {
     console.warn("hourly unvote failed.", error);
     voteStateByEventId[eventId] = {
@@ -1917,6 +1939,11 @@ function bindTopNavMoreMenu() {
 }
 
 async function init() {
+  window.addEventListener("storage", event => {
+    if (event.key === VOTE_STATE_STORAGE_KEY) {
+      syncVoteStateFromStorage();
+    }
+  });
   currentLang = resolveInitialLanguage();
   bindLanguageButtons();
   bindTopNavMoreMenu();

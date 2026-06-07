@@ -7,6 +7,7 @@
 .championship-page {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .championship-hero {
@@ -21,12 +22,14 @@
     radial-gradient(circle at top right, rgba(126, 34, 206, 0.14), transparent 32%),
     rgba(13, 20, 30, 0.94);
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .championship-hero h1 {
   margin-top: 8px;
   font-size: clamp(2rem, 4.2vw, 3.4rem);
   line-height: 0.98;
+  overflow-wrap: anywhere;
 }
 
 .championship-hero p {
@@ -34,6 +37,7 @@
   margin-top: 12px;
   color: var(--muted);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .championship-progress {
@@ -63,6 +67,7 @@
 
 .championship-section {
   margin-top: 0;
+  min-width: 0;
 }
 
 .championship-page .schedule-event-card-inner {
@@ -84,6 +89,7 @@
 
 .championship-page .schedule-event-track {
   background: rgba(241, 245, 249, 0.2);
+  overflow-wrap: anywhere;
 }
 
 .championship-page .table-wrap {
@@ -168,6 +174,7 @@
   color: #fff;
   font-size: 1.22rem;
   font-weight: 950;
+  overflow-wrap: anywhere;
 }
 
 .championship-winner-points {
@@ -178,6 +185,7 @@
 .championship-race-results {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .championship-race-card {
@@ -187,6 +195,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background: rgba(8, 12, 18, 0.38);
+  min-width: 0;
 }
 
 .championship-race-card-head {
@@ -203,12 +212,14 @@
   margin-top: 8px;
   font-size: 1.35rem;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .championship-race-card p {
   margin-top: 4px;
   color: var(--muted);
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .championship-race-summary {
@@ -291,6 +302,10 @@
 }
 
 @media (max-width: 720px) {
+  body.championship-body {
+    overflow-x: hidden;
+  }
+
   .championship-page {
     width: min(100% - 20px, 1200px);
     gap: 12px;

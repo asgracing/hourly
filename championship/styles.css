@@ -86,6 +86,11 @@
   background: rgba(241, 245, 249, 0.2);
 }
 
+.championship-page .table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .championship-standings-table th,
 .championship-standings-table td,
 .championship-race-table th,
@@ -190,9 +195,14 @@
   gap: 16px;
 }
 
+.championship-race-card-head > * {
+  min-width: 0;
+}
+
 .championship-race-card h3 {
   margin-top: 8px;
   font-size: 1.35rem;
+  line-height: 1.1;
 }
 
 .championship-race-card p {
@@ -208,6 +218,10 @@
   color: #dce8f7;
   font-weight: 750;
   text-align: right;
+}
+
+.championship-race-summary span {
+  min-width: 0;
 }
 
 .championship-lightbox {
@@ -261,6 +275,18 @@
 
   .championship-race-summary {
     text-align: left;
+  }
+
+  .championship-prizes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .championship-standings-table th,
+  .championship-standings-table td,
+  .championship-race-table th,
+  .championship-race-table td {
+    padding: 12px 14px;
+    font-size: 0.92rem;
   }
 }
 
@@ -317,13 +343,73 @@
     font-size: 1.2rem;
   }
 
+  .championship-page .table-card {
+    border-radius: 16px;
+  }
+
+  .championship-page .table-wrap {
+    margin-inline: -2px;
+    padding-bottom: 2px;
+  }
+
+  .championship-standings-table,
+  .championship-race-table {
+    min-width: 560px;
+  }
+
+  .championship-standings-table th,
+  .championship-standings-table td,
+  .championship-race-table th,
+  .championship-race-table td {
+    padding: 10px 12px;
+    font-size: 0.84rem;
+  }
+
+  .championship-standings-table td:nth-child(2),
+  .championship-race-table td:nth-child(2) {
+    min-width: 152px;
+  }
+
   .championship-progress-card,
   .championship-prize-thumb,
   .championship-race-card {
     border-radius: 14px;
   }
 
-  .championship-table-wrap {
-    overflow-x: auto;
+  .championship-prizes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .championship-race-card h3 {
+    font-size: 1.1rem;
+  }
+
+  .championship-race-summary {
+    gap: 4px;
+    font-size: 0.88rem;
+  }
+
+  #schedule-modal.is-open {
+    padding-top: 118px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  #schedule-modal .modal-card-slot {
+    max-height: calc(100dvh - 128px);
+    overflow: auto;
+    width: 100%;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .schedule-modal-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-modal-subtitle-grid {
+    grid-template-columns: 1fr;
   }
 }

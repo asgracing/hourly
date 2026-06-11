@@ -5,8 +5,11 @@ function normalizeBaseUrl(value) {
 }
 
 const isAsgPublicSite = /(^|\.)asgracing\.ru$/i.test(window.location.hostname);
+const isLocalDevHost = /^(localhost|127\.0\.0\.1|::1)$/i.test(window.location.hostname);
 const defaultDataBase = isAsgPublicSite
   ? "https://data.asgracing.ru/hourly-data"
+  : isLocalDevHost
+    ? "https://data.asgracing.ru/hourly-data"
   : window.location.hostname === "asgracing.github.io"
     ? "https://asgracing.github.io/hourly-data"
     : "/hourly-data";

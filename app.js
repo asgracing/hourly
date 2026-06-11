@@ -7,13 +7,18 @@ const topApiBase = normalizeBaseUrl(pageParams.get("topApiBase"));
 const topApiRoot = topApiBase.replace(/\/top-data\/v2$/i, "");
 const hourlyApiRoot = hourlyApiBase.replace(/\/hourly-data$/i, "");
 const isAsgPublicSite = /(^|\.)asgracing\.ru$/i.test(window.location.hostname);
+const isLocalDevHost = /^(localhost|127\.0\.0\.1|::1)$/i.test(window.location.hostname);
 const defaultHourlyDataBaseUrl = isAsgPublicSite
   ? "https://data.asgracing.ru/hourly-data"
+  : isLocalDevHost
+    ? "https://data.asgracing.ru/hourly-data"
   : window.location.hostname === "asgracing.github.io"
     ? "https://asgracing.github.io/hourly-data"
     : "/hourly-data";
 const defaultTopDataBaseUrl = isAsgPublicSite
   ? "https://data.asgracing.ru/top-data"
+  : isLocalDevHost
+    ? "https://data.asgracing.ru/top-data"
   : window.location.hostname === "asgracing.github.io"
     ? "https://asgracing.github.io/top-data"
     : "/top-data";
@@ -489,6 +494,12 @@ let recentRacesTotalPages = 1;
 let selectedScheduleItem = null;
 let selectedRace = null;
 let hasLoadError = false;
+const hourlyLoadState = {
+  core: true,
+  recent: true
+};
+let recentRacesLoadPromise = null;
+let recentRacesObserver = null;
 let votesEnabled = Boolean(votesApiBase);
 let votesLoaded = false;
 let voteStateByEventId = loadStoredVoteState();
@@ -545,6 +556,77 @@ function setHtml(id, value) {
   if (element) element.innerHTML = value || escapeHtml(t("unknownValue"));
 }
 function compactJoin(parts) { return parts.filter(Boolean).join(" · "); }
+function renderLoadingMarkup(label = "") {
+  return `<div class="empty">${escapeHtml(label || t("loadingShort"))}</div>`;
+}
+function renderCoreLoadingState() {
+  setText("announcement-date", t("loadingShort"));
+  setText("announcement-time", t("loadingShort"));
+  setText("announcement-track", t("loadingShort"));
+  setText("hero-server-name", t("loadingShort"));
+  setText("hero-server-password", t("loadingShort"));
+  setText("hero-entry-rules", t("loadingShort"));
+  setText("hero-race-format", t("loadingShort"));
+  setText("hero-pitstop-rules", t("loadingShort"));
+  setText("hero-refuel-rules", t("loadingShort"));
+  setText("hero-tyre-rules", t("loadingShort"));
+  setText("hero-weather", t("loadingShort"));
+  setText("hero-championship-title", t("loadingShort"));
+  setText("hero-championship-meta", t("loadingShort"));
+  setText("hero-championship-badge", t("loadingShort"));
+  setText("hero-championship-track", t("loadingShort"));
+  setText("hero-championship-date", t("loadingShort"));
+  setText("hero-championship-weather", t("loadingShort"));
+  setText("hero-championship-format", t("loadingShort"));
+  setText("hero-championship-pit", t("loadingShort"));
+  setText("hero-championship-description", t("loadingShort"));
+
+  const voteEl = document.getElementById("hero-vote");
+  if (voteEl) voteEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
+  const scheduleEl = document.getElementById("schedule-list");
+  if (scheduleEl) scheduleEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
+  const calendarGridEl = document.getElementById("calendar-grid");
+  if (calendarGridEl) calendarGridEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
+  const calendarCountEl = document.getElementById("calendar-count");
+  if (calendarCountEl) calendarCountEl.textContent = t("loadingShort");
+}
+function renderRecentRacesLoadingState() {
+  const container = document.getElementById("recent-races-table");
+  if (container) container.innerHTML = renderLoadingMarkup(t("loadingShort"));
+}
+function setupRecentRacesLazyLoad() {
+  if (recentRacesObserver || recentRacesLoadPromise) return;
+  const target = document.getElementById("recent-races");
+  if (!target || !("IntersectionObserver" in window)) {
+    void ensureRecentRacesLoaded();
+    return;
+  }
+
+  recentRacesObserver = new IntersectionObserver((entries) => {
+    if (!entries.some(entry => entry.isIntersecting)) return;
+    recentRacesObserver?.disconnect();
+    recentRacesObserver = null;
+    void ensureRecentRacesLoaded();
+  }, { rootMargin: "240px 0px" });
+
+  recentRacesObserver.observe(target);
+}
+async function ensureRecentRacesLoaded() {
+  if (recentRacesLoadPromise) return recentRacesLoadPromise;
+
+  recentRacesLoadPromise = (async () => {
+    try {
+      await loadRecentRacesPage(1);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      hourlyLoadState.recent = false;
+      renderUI();
+    }
+  })();
+
+  return recentRacesLoadPromise;
+}
 function setHeroCopyButtonLabel(button, copied = false) {
   if (!button) return;
   const fieldLabel = t(button.dataset.copyLabelKey || "") || "";
@@ -1820,13 +1902,19 @@ function renderUI() {
     renderErrorState();
     return;
   }
+  if (hourlyLoadState.core) {
+    renderCoreLoadingState();
+    if (hourlyLoadState.recent) renderRecentRacesLoadingState();
+    return;
+  }
   renderAnnouncement(announcementData || {});
   renderHeroDetails(announcementData || {});
   renderChampionshipHero(announcementData || {});
   renderHeroVote();
   renderScheduleTable(scheduleItems);
   renderCalendar(scheduleItems);
-  renderRecentRaces(recentRaceItems);
+  if (hourlyLoadState.recent) renderRecentRacesLoadingState();
+  else renderRecentRaces(recentRaceItems);
   renderScheduleModal();
   renderRaceResultsModal();
 }
@@ -1953,18 +2041,18 @@ async function init() {
   bindChampionshipCardLink();
   renderUI();
   try {
-    const [announcement, schedule, recentRaces, serverStatus] = await Promise.all([
+    const [announcement, schedule, serverStatus] = await Promise.all([
       loadJson(announcementUrl),
       loadJson(scheduleUrl),
-      loadRecentRacesPage(1),
       loadJson(serverStatusUrl).catch(() => null)
     ]);
     announcementData = announcement || {};
     serverStatusData = serverStatus && typeof serverStatus === "object" ? serverStatus : null;
     scheduleItems = buildScheduleItems(schedule, announcementData);
-    recentRaceItems = Array.isArray(recentRaces) ? recentRaces : [];
     hasLoadError = false;
+    hourlyLoadState.core = false;
     renderUI();
+    setupRecentRacesLazyLoad();
     loadVotesForSchedule(scheduleItems.slice(0, 3)).finally(() => {
       renderUI();
     });

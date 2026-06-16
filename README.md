@@ -80,7 +80,7 @@ The repository includes `scripts/hourly_notify.py` and `.github/workflows/hourly
 
 What it does:
 - loads the next event from `https://data.asgracing.ru/hourly-data/announcement.json`
-- sends reminders in the `12:00 MSK +/-2h` and `18:00 MSK +/-2h` windows
+- sends reminders with a continuous eligibility window: the midday invite can go out from `12:00` to `17:59 MSK`, and the evening invite from `18:00` to `20:59 MSK`
 - stores sent-state in `.github/hourly_notify_state.json` so the same event is not announced twice
 
 Required GitHub secrets:

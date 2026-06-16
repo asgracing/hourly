@@ -33,7 +33,6 @@ WEATHER_SUMMARY_LABELS = {
 MSK_TIMEZONE = timezone(timedelta(hours=3))
 DEFAULT_NOON_TRIGGER_HOUR_MSK = 12
 DEFAULT_EVENING_TRIGGER_HOUR_MSK = 18
-DEFAULT_TRIGGER_WINDOW_HOURS = 2
 TELEGRAM_PREVIOUS_PINNED_MESSAGE_ID = None
 TELEGRAM_LAST_PINNED_MESSAGE_ID = None
 
@@ -422,20 +421,20 @@ def build_weather_summary(item):
     return " | ".join(parts) if parts else ""
 
 
-def build_clock_window(target_hour_msk, tolerance_hours):
-    target_minutes = target_hour_msk * 60
-    tolerance_minutes = max(0, tolerance_hours) * 60
+def build_clock_window(start_hour_msk, end_hour_msk, end_minute_msk=59):
     return {
         "mode": "clock_window",
-        "start_minutes": target_minutes - tolerance_minutes,
-        "end_minutes": target_minutes + tolerance_minutes,
+        "start_minutes": max(0, start_hour_msk * 60),
+        "end_minutes": max(0, end_hour_msk * 60 + end_minute_msk),
     }
 
 
 def build_windows():
     return {
-        "12_msk": build_clock_window(DEFAULT_NOON_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
-        "18_msk": build_clock_window(DEFAULT_EVENING_TRIGGER_HOUR_MSK, DEFAULT_TRIGGER_WINDOW_HOURS),
+        # Keep the notifier eligible through the whole day so delayed or sparse
+        # scheduled runs still deliver at least one invite before race start.
+        "12_msk": build_clock_window(DEFAULT_NOON_TRIGGER_HOUR_MSK, DEFAULT_EVENING_TRIGGER_HOUR_MSK - 1),
+        "18_msk": build_clock_window(DEFAULT_EVENING_TRIGGER_HOUR_MSK, 20),
     }
 
 

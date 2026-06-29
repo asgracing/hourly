@@ -25,6 +25,7 @@ const defaultTopDataBaseUrl = isAsgPublicSite
 const hourlyDataBaseUrl = hourlyApiBase || defaultHourlyDataBaseUrl;
 const announcementUrl = `${hourlyDataBaseUrl}/announcement.json`;
 const scheduleUrl = `${hourlyDataBaseUrl}/schedule.json`;
+const championshipsUrl = `${hourlyDataBaseUrl}/championships.json`;
 const recentRacesUrl = `${hourlyDataBaseUrl}/races/races.json`;
 const recentRaceDetailsBaseUrl = `${hourlyDataBaseUrl}/`;
 const serverStatusUrl = pageParams.get("serverStatusUrl") || (topApiRoot || hourlyApiRoot ? `${topApiRoot || hourlyApiRoot}/server-status` : `${defaultTopDataBaseUrl}/server_status.json`);
@@ -252,6 +253,16 @@ const translations = {
     championshipEyebrow: "Championship",
     championshipOpenButton: "Open championship",
     championshipNoDescription: "Follow the active championship progress, upcoming races and standings.",
+    championshipHistoryTitle: "Championship History",
+    championshipHistorySubtitle: "Current and archived ASG Racing championships with standings and results.",
+    championshipHistoryEmpty: "No published championships yet.",
+    championshipStatusActive: "Active",
+    championshipStatusUpcoming: "Upcoming",
+    championshipStatusFinished: "Finished",
+    championshipStatusArchived: "Archive",
+    championshipWinnerLabel: "Winner",
+    championshipRacesLabel: "Races",
+    championshipDriversLabel: "Drivers",
     votingDisabledChampionship: "Voting is disabled for championship events",
     voteButton: "I want to race!",
     voteButtonDone: "You're in",
@@ -493,9 +504,22 @@ Object.assign(translations.ru, {
 });
 
 let currentLang = "en";
+Object.assign(translations.ru, {
+  championshipHistoryTitle: "РСЃС‚РѕСЂРёСЏ С‡РµРјРїРёРѕРЅР°С‚РѕРІ",
+  championshipHistorySubtitle: "РўРµРєСѓС‰РёРµ Рё Р°СЂС…РёРІРЅС‹Рµ С‡РµРјРїРёРѕРЅР°С‚С‹ ASG Racing СЃ РёС‚РѕРіР°РјРё Рё СЃСЃС‹Р»РєР°РјРё РЅР° СЂРµР·СѓР»СЊС‚Р°С‚С‹.",
+  championshipHistoryEmpty: "РћРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… С‡РµРјРїРёРѕРЅР°С‚РѕРІ РїРѕРєР° РЅРµС‚.",
+  championshipStatusActive: "РђРєС‚РёРІРЅС‹Р№",
+  championshipStatusUpcoming: "РЎРєРѕСЂРѕ",
+  championshipStatusFinished: "Р—Р°РІРµСЂС€РµРЅ",
+  championshipStatusArchived: "РђСЂС…РёРІ",
+  championshipWinnerLabel: "РџРѕР±РµРґРёС‚РµР»СЊ",
+  championshipRacesLabel: "Р“РѕРЅРѕРє",
+  championshipDriversLabel: "РџРёР»РѕС‚РѕРІ"
+});
 let announcementData = {};
 let serverStatusData = null;
 let scheduleItems = [];
+let championshipItems = [];
 let recentRaceItems = [];
 
 function buildScheduleItems(schedule, announcement) {
@@ -870,6 +894,8 @@ function renderCoreLoadingState() {
   if (voteEl) voteEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
   const scheduleEl = document.getElementById("schedule-list");
   if (scheduleEl) scheduleEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
+  const championshipsEl = document.getElementById("championship-history-list");
+  if (championshipsEl) championshipsEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
   const calendarGridEl = document.getElementById("calendar-grid");
   if (calendarGridEl) calendarGridEl.innerHTML = renderLoadingMarkup(t("loadingShort"));
   const calendarCountEl = document.getElementById("calendar-count");
@@ -878,6 +904,44 @@ function renderCoreLoadingState() {
 function renderRecentRacesLoadingState() {
   const container = document.getElementById("recent-races-table");
   if (container) container.innerHTML = renderLoadingMarkup(t("loadingShort"));
+}
+function normalizeChampionshipStatus(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "active") return "active";
+  if (normalized === "upcoming") return "upcoming";
+  if (normalized === "finished") return "finished";
+  return "archived";
+}
+function getChampionshipStatusLabel(value) {
+  const normalized = normalizeChampionshipStatus(value);
+  if (normalized === "active") return t("championshipStatusActive");
+  if (normalized === "upcoming") return t("championshipStatusUpcoming");
+  if (normalized === "finished") return t("championshipStatusFinished");
+  return t("championshipStatusArchived");
+}
+function getChampionshipTitle(item) {
+  return getLocalizedField(item, "title", item?.title || item?.slug || "--");
+}
+function getChampionshipDescription(item) {
+  return getLocalizedField(item, "description", item?.description || t("championshipNoDescription"));
+}
+function getChampionshipUrl(item) {
+  const slug = String(item?.slug || "").trim();
+  return slug ? `./championship/?slug=${encodeURIComponent(slug)}` : "./championship/";
+}
+function normalizeChampionshipItems(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return items
+    .filter(item => item && typeof item === "object" && String(item.slug || "").trim())
+    .map(item => ({
+      ...item,
+      slug: String(item.slug || "").trim(),
+      status: normalizeChampionshipStatus(item.status),
+      title: getChampionshipTitle(item),
+      description: getChampionshipDescription(item),
+      race_count: Number(item.race_count) || 0,
+      driver_count: Number(item.driver_count) || 0
+    }));
 }
 function setupRecentRacesLazyLoad() {
   if (recentRacesObserver || recentRacesLoadPromise) return;
@@ -1740,6 +1804,56 @@ function renderChampionshipHero(data) {
   if (card) card.dataset.href = championshipUrl;
   applyHeroChampionshipCardBackground(data?.track_code);
 }
+function renderChampionshipHistory(items) {
+  const container = document.getElementById("championship-history-list");
+  if (!container) return;
+  if (!Array.isArray(items) || !items.length) {
+    container.innerHTML = `<div class="empty">${escapeHtml(t("championshipHistoryEmpty"))}</div>`;
+    return;
+  }
+  const cardsHtml = items.map(item => {
+    const top3 = Array.isArray(item.results_top3) ? item.results_top3.slice(0, 3) : [];
+    const winner = item.winner?.driver || top3[0]?.driver || t("unknownValue");
+    const statusLabel = getChampionshipStatusLabel(item.status);
+    const top3Html = top3.length
+      ? `<div class="championship-history-podium">${top3.map((row, index) => `
+          <div class="championship-history-podium-item">
+            <span class="championship-history-podium-rank">${index + 1}</span>
+            <span class="championship-history-podium-name">${escapeHtml(row?.driver || row?.public_id || "--")}</span>
+          </div>
+        `).join("")}</div>`
+      : "";
+    return `
+      <article class="championship-history-card">
+        <div class="championship-history-head">
+          <div>
+            <div class="championship-history-period">${escapeHtml(item.period || statusLabel)}</div>
+            <h3 class="championship-history-title">${escapeHtml(item.title)}</h3>
+          </div>
+          <span class="championship-history-status is-${escapeHtml(item.status)}">${escapeHtml(statusLabel)}</span>
+        </div>
+        <p class="championship-history-description">${escapeHtml(item.description || t("championshipNoDescription"))}</p>
+        <div class="championship-history-stats">
+          <div class="championship-history-stat">
+            <span class="championship-history-stat-label">${escapeHtml(t("championshipWinnerLabel"))}</span>
+            <span class="championship-history-stat-value">${escapeHtml(winner)}</span>
+          </div>
+          <div class="championship-history-stat">
+            <span class="championship-history-stat-label">${escapeHtml(t("championshipRacesLabel"))}</span>
+            <span class="championship-history-stat-value">${escapeHtml(item.race_count || 0)}</span>
+          </div>
+          <div class="championship-history-stat">
+            <span class="championship-history-stat-label">${escapeHtml(t("championshipDriversLabel"))}</span>
+            <span class="championship-history-stat-value">${escapeHtml(item.driver_count || 0)}</span>
+          </div>
+        </div>
+        ${top3Html}
+        <a class="championship-history-link" href="${escapeHtml(getChampionshipUrl(item))}">${escapeHtml(item.title)}</a>
+      </article>
+    `;
+  }).join("");
+  container.innerHTML = `<div class="championship-history-grid">${cardsHtml}</div>`;
+}
 function renderSchedule(rows) {
   const container = document.getElementById("schedule-list");
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -2170,6 +2284,8 @@ function bindChampionshipCardLink() {
 function renderErrorState() {
   document.getElementById("schedule-list").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
   document.getElementById("recent-races-table").innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
+  const championshipsContainer = document.getElementById("championship-history-list");
+  if (championshipsContainer) championshipsContainer.innerHTML = `<div class="empty">${escapeHtml(t("loadError"))}</div>`;
   setText("announcement-date", "--");
   setText("announcement-time", "--");
   setText("announcement-track", "--");
@@ -2197,6 +2313,7 @@ function renderUI() {
   renderAnnouncement(announcementData || {});
   renderHeroDetails(announcementData || {});
   renderChampionshipHero(announcementData || {});
+  renderChampionshipHistory(championshipItems);
   renderHeroVote();
   renderScheduleTable(scheduleItems);
   renderCalendar(scheduleItems);
@@ -2403,14 +2520,16 @@ async function init() {
     renderNewsNotificationsModal();
   });
   try {
-    const [announcement, schedule, serverStatus] = await Promise.all([
+    const [announcement, schedule, championships, serverStatus] = await Promise.all([
       loadJson(announcementUrl),
       loadJson(scheduleUrl),
+      loadJson(championshipsUrl).catch(() => ({ items: [] })),
       loadJson(serverStatusUrl).catch(() => null)
     ]);
     announcementData = announcement || {};
     serverStatusData = serverStatus && typeof serverStatus === "object" ? serverStatus : null;
     scheduleItems = buildScheduleItems(schedule, announcementData);
+    championshipItems = normalizeChampionshipItems(championships);
     hasLoadError = false;
     hourlyLoadState.core = false;
     renderUI();

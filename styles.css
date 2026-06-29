@@ -1443,6 +1443,160 @@ h2 {
   box-shadow: 0 16px 32px rgba(126, 34, 206, 0.28);
 }
 
+.championship-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.championship-history-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(9, 14, 21, 0.54);
+}
+
+.championship-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.championship-history-period {
+  color: #d8b4fe;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.championship-history-title {
+  margin: 4px 0 0;
+  color: #f6f7fb;
+  font-size: 1.06rem;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.championship-history-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8eef8;
+}
+
+.championship-history-status.is-active {
+  background: rgba(255, 91, 46, 0.16);
+  color: #ffd5c6;
+}
+
+.championship-history-status.is-upcoming {
+  background: rgba(255, 209, 102, 0.14);
+  color: #ffe5a3;
+}
+
+.championship-history-status.is-finished,
+.championship-history-status.is-archived {
+  background: rgba(123, 97, 255, 0.14);
+  color: #ddd1ff;
+}
+
+.championship-history-description {
+  margin: 0;
+  color: #d7e0ee;
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.championship-history-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.championship-history-stat {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.championship-history-stat-label {
+  color: #9eacc0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.championship-history-stat-value {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.championship-history-podium {
+  display: grid;
+  gap: 8px;
+}
+
+.championship-history-podium-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.championship-history-podium-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 209, 102, 0.16);
+  color: #ffe29b;
+  font-size: 0.8rem;
+  font-weight: 900;
+  flex: 0 0 auto;
+}
+
+.championship-history-podium-name {
+  color: #edf2fa;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.championship-history-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f7f9fc;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 .hero-announcement-weather,
 .hero-announcement-meta .stat {
   display: flex;
@@ -3446,6 +3600,11 @@ body.modal-open {
   }
 
   .schedule-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .championship-history-grid,
+  .championship-history-stats {
     grid-template-columns: 1fr;
   }
 

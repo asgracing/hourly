@@ -45,6 +45,7 @@ RECENT_RACES_PATH = DATA_ROOT_DIR / "recent_races.json"
 RACES_DIR = DATA_ROOT_DIR / "races"
 RACES_INDEX_PATH = RACES_DIR / "races.json"
 EVENTS_DIR = DATA_ROOT_DIR / "events"
+CHAMPIONSHIPS_PATH = DATA_ROOT_DIR / "championships.json"
 UTC_PLUS_3 = timezone(timedelta(hours=3))
 SCHEDULE_LOOKAHEAD_SLOTS = 3
 RECENT_RACES_LIMIT = 12
@@ -1054,6 +1055,44 @@ def active_championship_config(schedule_config: dict):
     return payload
 
 
+def championship_config_items(schedule_config: dict) -> list[dict]:
+    championship = schedule_config.get("championship")
+    if not isinstance(championship, dict):
+        return []
+
+    active_slug = str(championship.get("active_slug") or championship.get("slug") or "").strip()
+    shared_fields = {
+        key: value
+        for key, value in championship.items()
+        if key not in {"items", "championships"} and value not in (None, "")
+    }
+    configs = championship.get("items") or championship.get("championships") or []
+    normalized = []
+    seen_slugs = set()
+
+    for raw_item in configs:
+        if not isinstance(raw_item, dict):
+            continue
+        slug = str(raw_item.get("slug") or "").strip()
+        if not slug:
+            continue
+        payload = {**shared_fields, **raw_item}
+        payload["slug"] = slug
+        payload["status"] = payload.get("status") or ("active" if slug == active_slug else "archived")
+        if slug == active_slug and payload["status"] in {"finished", "archived"}:
+            payload["status"] = "active"
+        normalized.append(payload)
+        seen_slugs.add(slug)
+
+    if active_slug and active_slug not in seen_slugs:
+        fallback = {**shared_fields, "slug": active_slug}
+        fallback["status"] = fallback.get("status") or "active"
+        normalized.append(fallback)
+
+    normalized.sort(key=lambda item: (str(item.get("period") or ""), str(item.get("title") or item.get("slug") or "")), reverse=True)
+    return normalized
+
+
 def build_championship_standings(race_details: list[dict]):
     races = sorted(race_details, key=lambda item: item.get("finished_at") or item.get("date") or "")
     drivers = {}
@@ -1147,6 +1186,85 @@ def publish_active_championship(schedule_config: dict):
     return payload
 
 
+def build_championship_list_entry(payload: dict):
+    standings = payload.get("standings") or []
+    races = payload.get("races") or []
+    winner = standings[0] if standings else {}
+    return {
+        "slug": payload.get("slug"),
+        "title": payload.get("title"),
+        "status": payload.get("status") or "archived",
+        "period": payload.get("period"),
+        "description": payload.get("description") or "",
+        "description_ru": payload.get("description_ru") or "",
+        "description_en": payload.get("description_en") or "",
+        "description_i18n": payload.get("description_i18n"),
+        "updated_at": payload.get("updated_at"),
+        "race_count": len(races),
+        "driver_count": len(standings),
+        "winner": {
+            "driver": winner.get("driver"),
+            "public_id": winner.get("public_id"),
+            "points": winner.get("points"),
+        } if winner else None,
+        "results_top3": payload.get("results_top3") or standings[:3],
+        "details_url": f"/hourly/championship/?slug={payload.get('slug')}" if payload.get("slug") else "/hourly/championship/",
+        "cover_track": (races[0] or {}).get("track_code") if races else None,
+    }
+
+
+def load_existing_championship_payloads():
+    payloads = {}
+    if not EVENTS_DIR.exists():
+        return payloads
+    for index_path in EVENTS_DIR.glob("*/index.json"):
+        payload = load_json(index_path, default=None)
+        if not isinstance(payload, dict):
+            continue
+        slug = str(payload.get("slug") or index_path.parent.name).strip()
+        if not slug:
+            continue
+        payload["slug"] = slug
+        payloads[slug] = payload
+    return payloads
+
+
+def publish_championships_registry(schedule_config: dict, active_payload: dict | None):
+    existing_payloads = load_existing_championship_payloads()
+    if active_payload and active_payload.get("slug"):
+        existing_payloads[str(active_payload["slug"]).strip()] = active_payload
+
+    items = []
+    published_at = now_local_iso()
+    config_lookup = {item["slug"]: item for item in championship_config_items(schedule_config) if item.get("slug")}
+
+    for slug, config_item in config_lookup.items():
+        payload = dict(existing_payloads.get(slug) or {})
+        merged = {
+            **payload,
+            **{key: value for key, value in config_item.items() if value not in (None, "")},
+            "slug": slug,
+        }
+        if slug == (active_payload or {}).get("slug"):
+            merged["status"] = "active"
+        merged["updated_at"] = payload.get("updated_at") or merged.get("updated_at") or published_at
+        items.append(build_championship_list_entry(merged))
+
+    for slug, payload in existing_payloads.items():
+        if slug in config_lookup:
+            continue
+        merged = dict(payload)
+        merged["slug"] = slug
+        merged["status"] = merged.get("status") or "archived"
+        merged["updated_at"] = merged.get("updated_at") or published_at
+        items.append(build_championship_list_entry(merged))
+
+    items.sort(key=lambda item: (str(item.get("period") or ""), str(item.get("updated_at") or ""), str(item.get("title") or item.get("slug") or "")), reverse=True)
+    registry = {"items": items, "updated_at": published_at}
+    save_json(CHAMPIONSHIPS_PATH, registry)
+    return registry
+
+
 def save_race_details(race_details_payload: dict):
     RACES_DIR.mkdir(parents=True, exist_ok=True)
     expected_files = {RACES_INDEX_PATH.name}
@@ -1182,14 +1300,17 @@ def main():
     save_json(RACES_INDEX_PATH, recent_races_summary)
     save_race_details(recent_races_details)
     championship_payload = publish_active_championship(schedule_config)
+    championships_registry = publish_championships_registry(schedule_config, championship_payload)
     print("publisher.py completed successfully.")
     print(f"schedule.json updated: {SCHEDULE_PATH}")
     print(f"calendar.json updated: {CALENDAR_PATH}")
     print(f"announcement.json updated: {ANNOUNCEMENT_PATH}")
     print(f"recent_races.json updated: {RECENT_RACES_PATH}")
     print(f"races index updated: {RACES_INDEX_PATH}")
+    print(f"championships index updated: {CHAMPIONSHIPS_PATH}")
     if championship_payload:
         print(f"championship updated: {championship_payload['slug']}")
+    print(f"championships published: {len(championships_registry.get('items') or [])}")
 
 
 if __name__ == "__main__":

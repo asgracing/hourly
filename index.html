@@ -79,11 +79,35 @@
       </div>
       <div class="top-nav-center">
         <div class="top-nav-menu">
-          <a class="top-nav-link top-nav-link-secondary" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard" data-nav-item="true">Leaderboard</a>
-          <a class="top-nav-link top-nav-link-secondary" href="#schedule" data-i18n="navUpcoming" data-nav-item="true">Upcoming Slots</a>
-          <a class="top-nav-link top-nav-link-secondary" href="#recent-races" data-i18n="navRaceResults" data-nav-item="true">Race Results</a>
+          <a class="top-nav-link top-nav-link-secondary top-nav-link-hourly is-current" href="#top" data-i18n="navHourly" data-nav-item="true">Hourly Race</a>
           <a class="top-nav-link top-nav-link-secondary top-nav-link-championship" href="./championship/" data-i18n="championshipEyebrow" data-nav-item="true">Championship</a>
-          <a class="top-nav-link top-nav-link-secondary is-current" href="#top" data-i18n="navHourly" data-nav-item="true">Hourly Race</a>
+          <div class="top-nav-group" data-nav-item="true">
+            <button class="top-nav-link top-nav-link-secondary top-nav-group-toggle" type="button" aria-expanded="false" aria-haspopup="true">
+              <span data-i18n="navGroupEvent">Event</span>
+              <span class="top-nav-group-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="top-nav-group-menu" hidden>
+              <a class="top-nav-group-link" href="#schedule" data-i18n="navUpcoming">Upcoming Slots</a>
+              <a class="top-nav-group-link" href="#recent-races" data-i18n="navRaceResults">Race Results</a>
+            </div>
+          </div>
+          <div class="top-nav-group" data-nav-item="true">
+            <button class="top-nav-link top-nav-link-secondary top-nav-group-toggle" type="button" aria-expanded="false" aria-haspopup="true">
+              <span data-i18n="navGroupAsg">ASG Racing</span>
+              <span class="top-nav-group-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="top-nav-group-menu" hidden>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard">Back to Main</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#rules" data-i18n="btnRules">Rules</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/news/" data-i18n="btnNews">News</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#championship" data-i18n="btnChampionship">Rating</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#bestlaps" data-i18n="btnBestLaps">Best Laps</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#worst-safety" data-i18n="btnWorstSafety">Safety Rating</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/bans/" data-i18n="btnBans">Ban List</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/community/" data-i18n="btnCommunity">Community</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#about-server" data-i18n="btnAboutServer">About Server</a>
+            </div>
+          </div>
           <div class="top-nav-more" id="top-nav-more">
             <button
               class="top-nav-link top-nav-link-secondary top-nav-more-toggle"

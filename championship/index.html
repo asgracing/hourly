@@ -27,10 +27,35 @@
       </div>
       <div class="top-nav-center">
         <div class="top-nav-menu">
-          <a class="top-nav-link top-nav-link-secondary" href="../" data-i18n="navHourly" data-nav-item="true">Hourly Race</a>
+          <a class="top-nav-link top-nav-link-secondary top-nav-link-hourly" href="../" data-i18n="navHourly" data-nav-item="true">Hourly Race</a>
           <a class="top-nav-link top-nav-link-secondary is-current championship-nav-link" href="./" data-i18n="navChampionship" data-nav-item="true">Championship</a>
-          <a class="top-nav-link top-nav-link-secondary" href="#championship-standings-section" data-i18n="navStandings" data-nav-item="true">Standings</a>
-          <a class="top-nav-link top-nav-link-secondary" href="#championship-race-results-section" data-i18n="navPastRaces" data-nav-item="true">Past races</a>
+          <div class="top-nav-group is-current" data-nav-item="true">
+            <button class="top-nav-link top-nav-link-secondary top-nav-group-toggle" type="button" aria-expanded="false" aria-haspopup="true">
+              <span data-i18n="navGroupChampionship">Championship</span>
+              <span class="top-nav-group-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="top-nav-group-menu" hidden>
+              <a class="top-nav-group-link" href="#championship-standings-section" data-i18n="navStandings">Standings</a>
+              <a class="top-nav-group-link" href="#championship-race-results-section" data-i18n="navPastRaces">Past races</a>
+            </div>
+          </div>
+          <div class="top-nav-group" data-nav-item="true">
+            <button class="top-nav-link top-nav-link-secondary top-nav-group-toggle" type="button" aria-expanded="false" aria-haspopup="true">
+              <span data-i18n="navGroupAsg">ASG Racing</span>
+              <span class="top-nav-group-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="top-nav-group-menu" hidden>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/" data-i18n="navLeaderboard">Back to Main</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#rules" data-i18n="btnRules">Rules</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/news/" data-i18n="btnNews">News</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#championship" data-i18n="btnChampionship">Rating</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#bestlaps" data-i18n="btnBestLaps">Best Laps</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#worst-safety" data-i18n="btnWorstSafety">Safety Rating</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/bans/" data-i18n="btnBans">Ban List</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/community/" data-i18n="btnCommunity">Community</a>
+              <a class="top-nav-group-link" href="https://asgracing.github.io/top/#about-server" data-i18n="btnAboutServer">About Server</a>
+            </div>
+          </div>
           <div class="top-nav-more" id="top-nav-more">
             <button
               class="top-nav-link top-nav-link-secondary top-nav-more-toggle"

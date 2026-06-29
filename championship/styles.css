@@ -4,6 +4,13 @@
   color: #fff;
 }
 
+.top-nav-link-secondary.championship-nav-link,
+.top-nav-link-secondary.championship-nav-link.is-current {
+  background: linear-gradient(135deg, rgba(126, 34, 206, 0.98), rgba(168, 85, 247, 0.94));
+  border-color: rgba(216, 180, 254, 0.58);
+  color: #fff;
+}
+
 .championship-page {
   display: grid;
   gap: 18px;

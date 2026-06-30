@@ -402,8 +402,8 @@
     renderFooterLinks();
 
     const consent = readConsent();
-    if (consent?.analytics) {
-      initMetrika();
+    if (consent) {
+      if (consent.analytics) initMetrika();
       showBanner(false);
     } else {
       showBanner(true);

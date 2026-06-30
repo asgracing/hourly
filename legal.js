@@ -1,6 +1,8 @@
 (function () {
   const CONSENT_STORAGE_KEY = "asgPrivacyConsent";
+  const CONSENT_COOKIE_NAME = "asg_privacy_consent";
   const CONSENT_VERSION = "2026-04-30";
+  const CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
   const METRIKA_ID = Number.parseInt(
     document.querySelector('meta[name="yandex-metrika-id"]')?.getAttribute("content") || "",
     10
@@ -83,9 +85,31 @@
     return texts[lang]?.[key] || texts.en[key] || "";
   }
 
-  function readConsent() {
+  function getCookieDomain() {
+    const hostname = window.location.hostname;
+    if (!hostname || hostname === "localhost" || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":")) {
+      return "";
+    }
+    return `; domain=.${hostname.replace(/^\./, "")}`;
+  }
+
+  function readCookie(name) {
+    const prefix = `${name}=`;
+    return document.cookie
+      .split(";")
+      .map(item => item.trim())
+      .find(item => item.startsWith(prefix))
+      ?.slice(prefix.length) || "";
+  }
+
+  function writeConsentCookie(payload) {
+    document.cookie = `${CONSENT_COOKIE_NAME}=${encodeURIComponent(payload)}; max-age=${CONSENT_COOKIE_MAX_AGE}; path=/; SameSite=Lax${getCookieDomain()}`;
+  }
+
+  function parseConsent(rawValue) {
+    if (!rawValue) return null;
     try {
-      const parsed = JSON.parse(localStorage.getItem(CONSENT_STORAGE_KEY) || "");
+      const parsed = JSON.parse(rawValue);
       if (!parsed || parsed.version !== CONSENT_VERSION || typeof parsed.analytics !== "boolean") {
         return null;
       }
@@ -95,15 +119,37 @@
     }
   }
 
+  function readConsent() {
+    const storageConsent = (() => {
+      try {
+        return parseConsent(localStorage.getItem(CONSENT_STORAGE_KEY) || "");
+      } catch (error) {
+        return null;
+      }
+    })();
+    if (storageConsent) return storageConsent;
+    const cookieConsent = parseConsent(decodeURIComponent(readCookie(CONSENT_COOKIE_NAME) || ""));
+    if (!cookieConsent) return null;
+    try {
+      localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(cookieConsent));
+    } catch (error) {
+      // Ignore storage write failures and keep cookie as the fallback source of truth.
+    }
+    return cookieConsent;
+  }
+
   function saveConsent(analytics) {
-    localStorage.setItem(
-      CONSENT_STORAGE_KEY,
-      JSON.stringify({
-        version: CONSENT_VERSION,
-        analytics: Boolean(analytics),
-        savedAt: new Date().toISOString()
-      })
-    );
+    const payload = JSON.stringify({
+      version: CONSENT_VERSION,
+      analytics: Boolean(analytics),
+      savedAt: new Date().toISOString()
+    });
+    try {
+      localStorage.setItem(CONSENT_STORAGE_KEY, payload);
+    } catch (error) {
+      // Ignore storage write failures and rely on the consent cookie instead.
+    }
+    writeConsentCookie(payload);
   }
 
   function createButton(label, className) {

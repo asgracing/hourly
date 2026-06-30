@@ -458,6 +458,20 @@ function getLocalizedField(item, key, fallback = "--") {
   }
   return fallback;
 }
+function getWinnerDisplayName(winner) {
+  if (typeof winner === "string" && winner.trim()) return winner.trim();
+  if (!winner || typeof winner !== "object") return "";
+  return pickFirstNonEmpty(
+    winner.name,
+    winner.full_name,
+    winner.display_name,
+    winner.driver,
+    winner.nickname,
+    winner.user_name,
+    winner.username,
+    winner.current_driver_name
+  );
+}
 function setText(id, value) {
   const element = document.getElementById(id);
   if (element) element.textContent = value || t("unknownValue");
@@ -1372,7 +1386,7 @@ function renderRecentRaces(rows) {
     <tr class="is-interactive-row" data-race-index="${index}" tabindex="0" role="button" aria-label="${escapeHtml(`${t("openRaceDetailsLabel")}: ${race.track_name || race.track || "-"}`)}">
       <td>${escapeHtml(formatDateTimeLocal(race.finished_at || race.finished_at_local))}</td>
       <td><div class="race-track-cell"><span class="race-track-name">${escapeHtml(race.track_name || humanizeTrackName(race.track))}</span></div></td>
-      <td><span class="race-winner">${escapeHtml(race.winner || t("noWinner"))}</span></td>
+      <td><span class="race-winner">${escapeHtml(getWinnerDisplayName(race.winner) || t("noWinner"))}</span></td>
       <td>${escapeHtml(race.participants_count ?? "-")}</td>
       <td><div>${escapeHtml(race.best_lap || "-")}</div><div class="race-note">${escapeHtml(race.best_lap_driver || "-")}</div></td>
     </tr>
@@ -1463,7 +1477,7 @@ function renderRaceResultsModal() {
   subtitleEl.textContent = formatDateTimeLocal(selectedRace.finished_at || selectedRace.finished_at_local);
   summaryEl.innerHTML = `
     <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("raceSummaryTrack"))}</div><div class="race-summary-value">${escapeHtml(selectedRace.track_name || humanizeTrackName(selectedRace.track))}</div></div>
-    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("raceSummaryWinner"))}</div><div class="race-summary-value">${escapeHtml(selectedRace.winner || t("noWinner"))}</div></div>
+    <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("raceSummaryWinner"))}</div><div class="race-summary-value">${escapeHtml(getWinnerDisplayName(selectedRace.winner) || t("noWinner"))}</div></div>
     <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("raceSummaryDrivers"))}</div><div class="race-summary-value">${escapeHtml(selectedRace.participants_count ?? "-")}</div></div>
     <div class="race-summary-card"><div class="race-summary-label">${escapeHtml(t("raceSummaryBestLap"))}</div><div class="race-summary-value">${escapeHtml(selectedRace.best_lap || "-")}</div></div>
   `;
@@ -1604,7 +1618,7 @@ async function openRaceResultsModal(race) {
     track: race.track,
     finished_at: race.finished_at,
     participants_count: race.participants_count,
-    winner: race.winner,
+    winner: getWinnerDisplayName(race.winner),
     best_lap: race.best_lap,
     results: []
   };

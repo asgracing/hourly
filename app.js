@@ -18,6 +18,11 @@ const defaultTopDataBaseUrl = isAsgPublicSite
     ? "https://asgracing.github.io/top-data"
     : "/top-data";
 const hourlyDataBaseUrl = hourlyApiBase || defaultHourlyDataBaseUrl;
+const topSiteBaseUrl = isAsgPublicSite
+  ? "https://asgracing.ru"
+  : window.location.hostname === "asgracing.github.io"
+    ? "https://asgracing.github.io/top"
+    : "/top";
 const announcementUrl = `${hourlyDataBaseUrl}/announcement.json`;
 const scheduleUrl = `${hourlyDataBaseUrl}/schedule.json`;
 const recentRacesUrl = `${hourlyDataBaseUrl}/races/races.json`;
@@ -445,6 +450,17 @@ function resolveInitialLanguage() {
 }
 function escapeHtml(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function getDriverProfileHref(publicId) {
+  const resolvedId = String(publicId || "").trim();
+  if (!resolvedId) return null;
+  return `${topSiteBaseUrl}/driver/?id=${encodeURIComponent(resolvedId)}`;
+}
+function renderDriverLink(name, publicId, className = "driver-link") {
+  const safeName = escapeHtml(name || "-");
+  const href = getDriverProfileHref(publicId);
+  if (!href) return `<span class="${escapeHtml(className)}">${safeName}</span>`;
+  return `<a class="${escapeHtml(className)}" href="${escapeHtml(href)}">${safeName}</a>`;
 }
 function getLocalizedField(item, key, fallback = "--") {
   if (!item || typeof item !== "object") return fallback;
@@ -1483,11 +1499,11 @@ function renderRaceResultsModal() {
   `;
   const headers = t("raceModalCols").map(label => `<th>${escapeHtml(label)}</th>`).join("");
   const rows = (selectedRace.results || []).map(row => `
-    <tr>
+    <tr class="${row.public_id ? "is-interactive-row" : ""}"${row.public_id ? ` data-driver-public-id="${escapeHtml(row.public_id)}"` : ""} tabindex="${row.public_id ? "0" : "-1"}" role="${row.public_id ? "link" : "row"}" aria-label="${row.public_id ? escapeHtml(`${row.driver || "-"} profile`) : ""}">
       <td><span class="rank-badge rank-${escapeHtml(row.position)}">#${escapeHtml(row.position)}</span></td>
       <td>${escapeHtml(formatStartPosition(row))}</td>
       <td>${renderPositionsDelta(row.positions_delta)}</td>
-      <td><div class="driver-cell"><div class="driver-avatar">${escapeHtml(initials(row.driver))}</div><div class="driver-name-wrap"><div class="driver-name">${escapeHtml(row.driver || "-")}</div><div class="race-note">${escapeHtml(row.race_number != null ? `#${row.race_number}` : "")}</div></div></div></td>
+      <td><div class="driver-cell"><div class="driver-avatar">${escapeHtml(initials(row.driver))}</div><div class="driver-name-wrap"><div class="driver-name">${renderDriverLink(row.driver || "-", row.public_id, "driver-link")}</div><div class="race-note">${escapeHtml(row.race_number != null ? `#${row.race_number}` : "")}</div></div></div></td>
       <td><div>${escapeHtml(row.best_lap || "-")}</div><div class="race-note">${row.had_best_lap ? escapeHtml(t("raceBestLapBadge")) : ""}</div></td>
       <td><div>${escapeHtml(row.car_name || "-")}</div><div class="race-note">${row.counted_for_stats === false ? escapeHtml(t("notCountedBadge")) : ""}</div></td>
       <td>${escapeHtml(row.gap || (row.position === 1 ? "-" : "-"))}</td>
@@ -1496,6 +1512,20 @@ function renderRaceResultsModal() {
     </tr>
   `).join("");
   tableEl.innerHTML = `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
+  tableEl.querySelectorAll("tbody tr[data-driver-public-id]").forEach(row => {
+    const href = getDriverProfileHref(row.dataset.driverPublicId);
+    if (!href) return;
+    const openRow = () => { window.location.href = href; };
+    row.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) openRow();
+    });
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openRow();
+      }
+    });
+  });
 }
 function renderScheduleModal() {
   const titleEl = document.getElementById("schedule-modal-title");

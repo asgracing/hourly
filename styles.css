@@ -1597,6 +1597,18 @@ tbody tr:not(.is-interactive-row):hover {
   font-weight: 800;
 }
 
+.driver-link,
+.driver-link:visited {
+  color: #fff;
+  text-decoration: none;
+}
+
+.driver-link:hover,
+.driver-link:focus-visible {
+  color: #fff5cf;
+  text-decoration: underline;
+}
+
 .race-note {
   font-size: 13px;
   line-height: 1.35;

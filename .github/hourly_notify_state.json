@@ -587,10 +587,15 @@
         "12_msk": "2026-06-30T10:31:08+00:00",
         "18_msk": "2026-06-30T15:14:53+00:00"
       }
+    },
+    "hourly_2026-07-01_2100": {
+      "sent": {
+        "12_msk": "2026-07-01T10:41:02+00:00"
+      }
     }
   },
-  "last_event_id": "hourly_2026-06-30_2100",
+  "last_event_id": "hourly_2026-07-01_2100",
   "telegram": {
-    "last_pinned_message_id": 39138
+    "last_pinned_message_id": 39533
   }
 }

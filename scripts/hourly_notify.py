@@ -18,7 +18,17 @@ DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.ru"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
 TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
-SUPPORTED_TRACK_IMAGES = {"spa", "monza", "silverstone", "nurburgring"}
+TRACK_IMAGE_ALIASES = {
+    "spa": "spa",
+    "monza": "monza",
+    "silverstone": "silverstone",
+    "nurburgring": "nurburgring",
+    "nurburgring_24h": "nurburgring_24h",
+    "nurburgring24h": "nurburgring_24h",
+    "nurburgring-24h": "nurburgring_24h",
+    "nordschleife": "nurburgring_24h",
+    "nordschl": "nurburgring_24h",
+}
 RACE_PAGE_BUTTON_LABEL = "ХОЧУ ПОЕХАТЬ!"
 COPY_SERVER_BUTTON_LABEL = "СЕРВЕР"
 COPY_PASSWORD_BUTTON_LABEL = "ПАРОЛЬ"
@@ -280,11 +290,12 @@ def build_discord_link_button(details_url):
 
 def build_track_image_url(item, channel="default"):
     track_code = normalize_event_id(item.get("track_code") or item.get("track_name"))
-    if track_code not in SUPPORTED_TRACK_IMAGES:
+    track_asset = TRACK_IMAGE_ALIASES.get(track_code)
+    if not track_asset:
         return ""
-    if channel == "telegram" and track_code == "monza":
+    if channel == "telegram" and track_asset == "monza":
         return f"{TRACK_IMAGE_BASE_URL}/monzaTG.jpg"
-    return f"{TRACK_IMAGE_BASE_URL}/{track_code}.jpg"
+    return f"{TRACK_IMAGE_BASE_URL}/{track_asset}.jpg"
 
 
 def parse_timezone_offset(value):

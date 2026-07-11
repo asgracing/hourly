@@ -19,6 +19,23 @@ const hourlyAssetBase = "https://asgracing.github.io/hourly/assets";
 const votesApiBase = "https://hourly-votes.asgracing.workers.dev";
 const VOTE_STATE_STORAGE_KEY = "hourlyVoteStateByEventId";
 const VOTE_STATE_STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function getLegalUrls() {
+  const fallbackBase =
+    document.querySelector('meta[name="legal-base-path"]')?.getAttribute("content")?.trim() || "../";
+  return window.ASGLegal?.getUrls?.() || {
+    privacy: `${fallbackBase}privacy/`,
+    cookies: `${fallbackBase}cookies/`
+  };
+}
+
+function buildCompactVoteLegalNoteHtml() {
+  const { privacy } = getLegalUrls();
+  if (currentLang === "ru") {
+    return `Голосуя, вы соглашаетесь с обработкой тех. идентификатора браузера. <a href="${esc(privacy)}">Подробнее</a>.`;
+  }
+  return `Voting means you agree to processing of a technical browser identifier. <a href="${esc(privacy)}">Details</a>.`;
+}
 const NEWS_READ_STORAGE_KEY = "asgReadNewsIds.v2";
 const topSiteBaseUrl = isAsgPublicSite || isLocalDevHost
   ? "https://asgracing.ru"
@@ -1130,6 +1147,7 @@ function renderUpcoming(items, standings) {
           <div class="schedule-event-track">${esc(getLocalizedField(item, "track_name", item.track_code || "--"))}</div>
           <div class="schedule-event-weather"><span>${esc(weatherLabel(item.weather || {}))}</span><img src="${esc(WEATHER_ICON_PATHS.rain)}" alt="" /></div>
           ${renderVoteControl(item)}
+          <div class="legal-inline-note">${buildCompactVoteLegalNoteHtml()}</div>
         </div>
       </article>
     `;
@@ -1157,6 +1175,7 @@ function buildScheduleModalDetails(item) {
     <div class="schedule-modal-hero">
       <div class="schedule-modal-vote">
         ${renderVoteControl(item)}
+        <div class="legal-inline-note">${buildCompactVoteLegalNoteHtml()}</div>
       </div>
       <section class="hero-server-card schedule-modal-hero-pane">
         <div class="hero-server-stack">

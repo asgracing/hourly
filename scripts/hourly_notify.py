@@ -432,6 +432,28 @@ def build_weather_summary(item):
     return " | ".join(parts) if parts else ""
 
 
+def build_rain_summary(item, language="en"):
+    weather = item.get("weather") if isinstance(item.get("weather"), dict) else {}
+    rain_percent = format_weather_percent(weather.get("rain_level"))
+    if rain_percent is None:
+        rain_percent = format_weather_percent(item.get("rain_level"))
+    if rain_percent is None:
+        return ""
+
+    if rain_percent < 5:
+        emoji, label_en, label_ru = "☀️", "No rain expected", "Без дождя"
+    elif rain_percent < 20:
+        emoji, label_en, label_ru = "🌦", "Low chance of rain", "Низкая вероятность дождя"
+    elif rain_percent < 50:
+        emoji, label_en, label_ru = "🌧", "Rain possible", "Дождь возможен"
+    elif rain_percent < 75:
+        emoji, label_en, label_ru = "🌧️", "High chance of rain", "Высокая вероятность дождя"
+    else:
+        emoji, label_en, label_ru = "⛈️", "Heavy rain expected", "Ожидается сильный дождь"
+    label = label_ru if language == "ru" else label_en
+    return f"{emoji} {label} · {rain_percent}%"
+
+
 GAME_TIME_EMOJIS = {
     "morning": "🌅",
     "day": "☀️",
@@ -677,7 +699,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     timezone_label = str(item.get("timezone") or "UTC").strip()
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
-    weather_summary = build_weather_summary(item)
+    weather_summary = build_rain_summary(item, language="en")
     server_name = get_server_name(item)
     server_password = get_server_password(item)
 
@@ -713,7 +735,7 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
     timezone_label = str(item.get("timezone") or "UTC").strip()
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
-    weather_summary = build_weather_summary(item)
+    weather_summary = build_rain_summary(item, language="ru")
     server_name = get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME
     server_password = get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD
 
@@ -724,12 +746,12 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
         f"Дата: {date_str}",
         f"Старт: {start_time_local} {timezone_label}".strip(),
     ]
+    if weather_summary:
+        lines.append(f"Погода: {weather_summary}")
     if registrations not in (None, ""):
         lines.append(f"Участников: {registrations}")
     lines.append(f"Сервер: {server_name}")
     lines.append(f"Пароль: {server_password}")
-    if weather_summary:
-        lines.append(f"Погода: {weather_summary}")
     game_time = format_game_time(item, language="ru")
     if game_time:
         lines.append(f"Игровое время: {game_time}")
@@ -748,6 +770,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     title = escape(build_telegram_title(item, trigger_key, time_until_start))
     hype_line = build_telegram_hype_line(trigger_key, time_until_start, item=item)
     registrations = item.get("registrations")
+    weather_summary = build_rain_summary(item, language="ru")
     server_name = escape(get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME)
     server_password = escape(get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD)
 
@@ -755,6 +778,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
         f"🏁 <b>{title}</b>",
         "",
         hype_line,
+        "",
         f"📍 <b>Трасса:</b> {track_name}",
         f"📅 <b>Дата:</b> {date_str}",
         f"⏰ <b>Старт:</b> {start_time_local} {timezone_label}".strip(),
@@ -763,6 +787,9 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     game_time = format_game_time(item, language="ru")
     if game_time:
         lines.append(f"🎮 <b>Игровое время:</b> {escape(game_time)}")
+
+    if weather_summary:
+        lines.append(f"<b>Погода:</b> {escape(weather_summary)}")
 
     if registrations not in (None, ""):
         lines.append(f"👥 <b>Участников:</b> {escape(str(registrations))}")
@@ -780,7 +807,7 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     details_url = build_details_url(item)
     registrations = item.get("registrations")
     image_url = build_track_image_url(item)
-    weather_summary = build_weather_summary(item)
+    weather_summary = build_rain_summary(item, language="en")
     server_name = get_server_name(item)
     server_password = get_server_password(item)
 
@@ -1026,9 +1053,6 @@ def dispatch(item, trigger_key, time_until_start=None):
     if track_image_url:
         try:
             caption = build_photo_caption(item, trigger_key, time_until_start)
-            weather_summary = build_weather_summary(item)
-            if weather_summary and "<b>Погода:</b>" not in caption:
-                caption = f"{caption}\n<b>Погода:</b> {escape(weather_summary)}"
             telegram_sent = send_telegram_photo(
                 caption,
                 track_image_url,

@@ -432,6 +432,99 @@ def build_weather_summary(item):
     return " | ".join(parts) if parts else ""
 
 
+GAME_TIME_EMOJIS = {
+    "morning": "🌅",
+    "day": "☀️",
+    "evening": "🌇",
+    "night": "🌙",
+}
+
+
+def is_championship_event(item):
+    return str(item.get("event_type") or "").strip().lower() == "championship"
+
+
+def get_championship_title(item):
+    championship = item.get("championship") if isinstance(item.get("championship"), dict) else {}
+    for candidate in (
+        item.get("championship_title"),
+        championship.get("title"),
+        item.get("title"),
+    ):
+        title = str(candidate or "").strip()
+        if title:
+            return title
+    return "ASG Racing"
+
+
+def get_game_time_details(item, language="en"):
+    game_time = item.get("game_time") if isinstance(item.get("game_time"), dict) else {}
+    code = str(
+        game_time.get("code")
+        or game_time.get("profile_id")
+        or item.get("game_time_code")
+        or ""
+    ).strip().lower()
+    raw_hour = game_time.get("hour_of_day", item.get("hour_of_day", item.get("game_time_hour")))
+    try:
+        hour = max(0, min(23, int(round(float(raw_hour)))))
+    except (TypeError, ValueError):
+        hour = None
+
+    if code not in GAME_TIME_EMOJIS and hour is not None:
+        if 5 <= hour <= 10:
+            code = "morning"
+        elif 11 <= hour <= 15:
+            code = "day"
+        elif 16 <= hour <= 20:
+            code = "evening"
+        else:
+            code = "night"
+
+    label_keys = (
+        ("asset_label_ru", "label_ru", "asset_label", "label")
+        if language == "ru"
+        else ("asset_label", "label", "asset_label_ru", "label_ru")
+    )
+    label = next((str(game_time.get(key) or "").strip() for key in label_keys if game_time.get(key)), "")
+    asset = str(
+        game_time.get("asset")
+        or game_time.get("asset_id")
+        or item.get("game_time_asset")
+        or item.get("game_time_asset_id")
+        or ""
+    ).strip()
+    if not label:
+        label = asset.replace("_", " ").strip().title()
+    if not label and code:
+        labels = {
+            "ru": {"morning": "Утро", "day": "День", "evening": "Вечер", "night": "Ночь"},
+            "en": {"morning": "Morning", "day": "Day", "evening": "Evening", "night": "Night"},
+        }
+        label = labels["ru" if language == "ru" else "en"].get(code, code.title())
+
+    if not label and hour is None and not asset:
+        return None
+    return {
+        "emoji": GAME_TIME_EMOJIS.get(code, "🕒"),
+        "label": label or ("Игровое время" if language == "ru" else "Game time"),
+        "hour": f"{hour:02d}:00" if hour is not None else "",
+        "asset": asset,
+    }
+
+
+def format_game_time(item, language="en", include_asset=False):
+    details = get_game_time_details(item, language)
+    if not details:
+        return ""
+    parts = [f"{details['emoji']} {details['label']}"]
+    if details["hour"]:
+        parts.append(details["hour"])
+    if include_asset and details["asset"]:
+        parts.append(f"asset: {details['asset']}")
+    return " · ".join(parts)
+
+
 def build_clock_window(start_hour_msk, end_hour_msk, end_minute_msk=59):
     return {
         "mode": "clock_window",
@@ -543,7 +636,14 @@ def build_hype_prefix(channel="plain"):
     return "🔥🔥🔥 TAKE X5 POINTS! 🔥🔥🔥"
 
 
-def build_hype_line(trigger_key, time_until_start=None, channel="plain"):
+def build_hype_line(trigger_key, time_until_start=None, channel="plain", item=None):
+    if is_championship_event(item or {}):
+        lead = format_time_until_start(time_until_start)
+        championship_title = get_championship_title(item or {})
+        championship_label = f"CHAMPIONSHIP RACE — {championship_title}!"
+        emphasis = f"**{championship_label}**" if channel == "discord" else championship_label
+        countdown = f" Only {lead} until the start." if lead else ""
+        return f"🏆🏁 {emphasis}{countdown} Every position matters — this is where championship points and legends are made!"
     prefix = build_hype_prefix(channel)
     lead = format_time_until_start(time_until_start)
     if trigger_key == "12_msk":
@@ -557,8 +657,12 @@ def build_hype_line(trigger_key, time_until_start=None, channel="plain"):
     return f"{prefix} Quick delivery check for the hourly notifier."
 
 
-def build_telegram_hype_line(trigger_key, time_until_start=None):
+def build_telegram_hype_line(trigger_key, time_until_start=None, item=None):
     lead = format_time_until_start_ru(time_until_start)
+    if is_championship_event(item or {}):
+        championship_title = escape(get_championship_title(item or {}))
+        countdown = f" До старта осталось {lead}." if lead else ""
+        return f"🏆🏁 <b>ГОНКА ЧЕМПИОНАТА — {championship_title}!</b>{countdown} Каждый поворот и каждая позиция решают судьбу титула — такое нельзя пропустить!"
     prefix = "🔥🔥🔥 <b>В 5 раз больше очков!</b> 🔥🔥🔥"
     if trigger_key == "12_msk":
         return f"{prefix} До ближайшей часовой гонки осталось {lead}." if lead else f"{prefix} Дневное напоминание о часовой гонке."
@@ -579,7 +683,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
 
     lines = [
         build_notification_title(item, trigger_key, time_until_start),
-        build_hype_line(trigger_key, time_until_start, channel="plain"),
+        build_hype_line(trigger_key, time_until_start, channel="plain", item=item),
         f"Track: {track_name}",
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
@@ -590,6 +694,9 @@ def build_plain_message(item, trigger_key, time_until_start=None):
         lines.append(f"Password: {server_password}")
     if weather_summary:
         lines.append(f"Weather: {weather_summary}")
+    game_time = format_game_time(item, language="en", include_asset=True)
+    if game_time:
+        lines.append(f"Game time: {game_time}")
 
     if registrations not in (None, ""):
         lines.append(f"Registered drivers: {registrations}")
@@ -612,7 +719,7 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
 
     lines = [
         build_telegram_title(item, trigger_key, time_until_start),
-        build_telegram_hype_line(trigger_key, time_until_start).replace("<b>", "").replace("</b>", ""),
+        build_telegram_hype_line(trigger_key, time_until_start, item=item).replace("<b>", "").replace("</b>", ""),
         f"Трасса: {track_name}",
         f"Дата: {date_str}",
         f"Старт: {start_time_local} {timezone_label}".strip(),
@@ -623,6 +730,9 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
     lines.append(f"Пароль: {server_password}")
     if weather_summary:
         lines.append(f"Погода: {weather_summary}")
+    game_time = format_game_time(item, language="ru", include_asset=True)
+    if game_time:
+        lines.append(f"Игровое время: {game_time}")
 
     description = str(item.get("description") or "").strip()
     if description:
@@ -636,7 +746,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     start_time_local = escape(str(item.get("start_time_local") or "--").strip())
     timezone_label = escape(str(item.get("timezone") or "UTC").strip())
     title = escape(build_telegram_title(item, trigger_key, time_until_start))
-    hype_line = build_telegram_hype_line(trigger_key, time_until_start)
+    hype_line = build_telegram_hype_line(trigger_key, time_until_start, item=item)
     registrations = item.get("registrations")
     server_name = escape(get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME)
     server_password = escape(get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD)
@@ -649,6 +759,10 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
         f"📅 <b>Дата:</b> {date_str}",
         f"⏰ <b>Старт:</b> {start_time_local} {timezone_label}".strip(),
     ]
+
+    game_time = format_game_time(item, language="ru", include_asset=True)
+    if game_time:
+        lines.append(f"🎮 <b>Игровое время:</b> {escape(game_time)}")
 
     if registrations not in (None, ""):
         lines.append(f"👥 <b>Участников:</b> {escape(str(registrations))}")
@@ -681,12 +795,15 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
         fields.append({"name": "Password", "value": f"`{server_password}`", "inline": True})
     if weather_summary:
         fields.append({"name": "Weather", "value": weather_summary, "inline": False})
+    game_time = format_game_time(item, language="en", include_asset=True)
+    if game_time:
+        fields.append({"name": "Game time", "value": game_time, "inline": False})
     if registrations not in (None, ""):
         fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
 
     embed = {
         "title": build_notification_title(item, trigger_key, time_until_start),
-        "description": build_hype_line(trigger_key, time_until_start, channel="discord"),
+        "description": build_hype_line(trigger_key, time_until_start, channel="discord", item=item),
         "url": details_url,
         "color": 16748032,
         "fields": fields,

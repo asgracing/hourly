@@ -702,7 +702,7 @@ async function loadJsonOrNull(url) {
 }
 
 async function loadVotesForSchedule(items) {
-  const eventIds = items.filter(item => !isVotingDisabledForItem(item)).map(buildSlotEventId).filter(Boolean);
+  const eventIds = items.map(buildSlotEventId).filter(Boolean);
   if (!eventIds.length) return;
   try {
     const url = new URL("/votes", votesApiBase);
@@ -722,7 +722,7 @@ async function loadVotesForSchedule(items) {
 
 async function submitVote(item) {
   const eventId = buildSlotEventId(item);
-  if (!eventId || pendingVoteEventIds.has(eventId) || isVotingDisabledForItem(item)) return;
+  if (!eventId || pendingVoteEventIds.has(eventId)) return;
   pendingVoteEventIds.add(eventId);
   renderUpcoming(championshipUpcomingItems, []);
   try {
@@ -762,6 +762,7 @@ async function submitVote(item) {
   } finally {
     pendingVoteEventIds.delete(eventId);
     renderUpcoming(championshipUpcomingItems, []);
+    if (selectedScheduleItem && buildSlotEventId(selectedScheduleItem) === eventId) renderScheduleModal();
   }
 }
 
@@ -1044,7 +1045,6 @@ function renderWinners(standings) {
 }
 
 function renderVoteControl(item) {
-  if (isVotingDisabledForItem(item)) return "";
   const voteState = getVoteState(item);
   const voteCountLabel = voteState.failed
     ? t("voteFailed")
@@ -1080,6 +1080,18 @@ function renderVoteControl(item) {
       <div class="schedule-event-vote-meta">${esc(voteCountLabel)}</div>
     </div>
   `;
+}
+
+function bindVoteControls(root) {
+  root?.querySelectorAll("[data-vote-event-id]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      const eventId = button.dataset.voteEventId;
+      const item = championshipUpcomingItems.find(row => buildSlotEventId(row) === eventId)
+        || (selectedScheduleItem && buildSlotEventId(selectedScheduleItem) === eventId ? selectedScheduleItem : null);
+      if (item) void submitVote(item);
+    });
+  });
 }
 
 function renderUpcoming(items, standings) {
@@ -1122,14 +1134,7 @@ function renderUpcoming(items, standings) {
       </article>
     `;
   }).join("");
-  root.querySelectorAll("[data-vote-event-id]").forEach(button => {
-    button.addEventListener("click", event => {
-      event.stopPropagation();
-      const eventId = button.dataset.voteEventId;
-      const item = championshipUpcomingItems.find(row => buildSlotEventId(row) === eventId);
-      if (item) void submitVote(item);
-    });
-  });
+  bindVoteControls(root);
   root.querySelectorAll(".schedule-event-card[data-schedule-index]").forEach(card => {
     const openCard = () => openScheduleModal(championshipUpcomingItems[Number(card.dataset.scheduleIndex)] || null);
     card.addEventListener("click", openCard);
@@ -1150,6 +1155,9 @@ function buildScheduleModalDetails(item) {
   const detailsUrl = item?.details_url ? String(item.details_url) : "";
   return `
     <div class="schedule-modal-hero">
+      <div class="schedule-modal-vote">
+        ${renderVoteControl(item)}
+      </div>
       <section class="hero-server-card schedule-modal-hero-pane">
         <div class="hero-server-stack">
           <div class="hero-server-grid hero-server-grid-rules">
@@ -1229,6 +1237,7 @@ function renderScheduleModal() {
     </span>
   `;
   detailsEl.innerHTML = buildScheduleModalDetails(selectedScheduleItem);
+  bindVoteControls(detailsEl);
 }
 
 function openScheduleModal(item) {

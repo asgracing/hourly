@@ -694,7 +694,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
         lines.append(f"Password: {server_password}")
     if weather_summary:
         lines.append(f"Weather: {weather_summary}")
-    game_time = format_game_time(item, language="en", include_asset=True)
+    game_time = format_game_time(item, language="en")
     if game_time:
         lines.append(f"Game time: {game_time}")
 
@@ -730,7 +730,7 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
     lines.append(f"Пароль: {server_password}")
     if weather_summary:
         lines.append(f"Погода: {weather_summary}")
-    game_time = format_game_time(item, language="ru", include_asset=True)
+    game_time = format_game_time(item, language="ru")
     if game_time:
         lines.append(f"Игровое время: {game_time}")
 
@@ -760,7 +760,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
         f"⏰ <b>Старт:</b> {start_time_local} {timezone_label}".strip(),
     ]
 
-    game_time = format_game_time(item, language="ru", include_asset=True)
+    game_time = format_game_time(item, language="ru")
     if game_time:
         lines.append(f"🎮 <b>Игровое время:</b> {escape(game_time)}")
 
@@ -795,7 +795,7 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
         fields.append({"name": "Password", "value": f"`{server_password}`", "inline": True})
     if weather_summary:
         fields.append({"name": "Weather", "value": weather_summary, "inline": False})
-    game_time = format_game_time(item, language="en", include_asset=True)
+    game_time = format_game_time(item, language="en")
     if game_time:
         fields.append({"name": "Game time", "value": game_time, "inline": False})
     if registrations not in (None, ""):

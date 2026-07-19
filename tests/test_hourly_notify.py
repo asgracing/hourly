@@ -109,10 +109,27 @@ class NotificationTemplateTests(unittest.TestCase):
         self.assertIn("🟣🟢 <b>ЭТАП ЧЕМПИОНАТА • ENDURANCE</b>", caption)
 
     def test_discord_test_delivery_does_not_ping_everyone(self):
-        message = hourly_notify.build_discord_payload(event_payload(), "test")
+        message = hourly_notify.build_discord_payload(event_payload(), "test", timedelta(hours=3))
 
         self.assertNotIn("@everyone", message["content"])
         self.assertEqual(message["allowed_mentions"]["parse"], [])
+        self.assertTrue(message["embeds"][0]["title"].startswith("🧪 TEST • 🟠 DAILY HOURLY RACE"))
+        self.assertNotIn("test alert", message["embeds"][0]["title"].lower())
+
+    def test_telegram_test_looks_like_race_alert_with_test_badge(self):
+        payload = event_payload(
+            event_type="endurance",
+            race_format="endurance",
+            points_multiplier=10.0,
+            race_duration_minutes=120,
+        )
+        caption = hourly_notify.build_photo_caption(payload, "test", timedelta(hours=3))
+
+        self.assertTrue(caption.startswith("🧪 <b>ТЕСТОВОЕ УВЕДОМЛЕНИЕ</b>"))
+        self.assertIn("🟢 <b>ENDURANCE SPECIAL EVENT</b>", caption)
+        self.assertIn("Гонка на Monza через 3 ч", caption)
+        self.assertIn("В 10 раз больше очков!", caption)
+        self.assertNotIn("Проверяем доставку", caption)
 
 
 if __name__ == "__main__":

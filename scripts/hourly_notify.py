@@ -543,6 +543,15 @@ def build_event_type_header(item, language="en", channel="plain"):
     return f"{marker} {label}"
 
 
+def build_test_header(language="en", channel="plain"):
+    label = "ТЕСТОВОЕ УВЕДОМЛЕНИЕ" if language == "ru" else "TEST NOTIFICATION"
+    if channel == "telegram":
+        return f"🧪 <b>{label}</b>"
+    if channel == "discord":
+        return f"🧪 **{label}**"
+    return f"🧪 {label}"
+
+
 def get_championship_title(item):
     championship = item.get("championship") if isinstance(item.get("championship"), dict) else {}
     for candidate in (
@@ -710,8 +719,6 @@ def format_time_until_start_ru(time_until_start):
 def build_notification_title(item, trigger_key, time_until_start=None):
     lead = format_time_until_start(time_until_start)
     track_name = item.get("track_name") or "Unknown track"
-    if trigger_key == "test":
-        return f"ASG Racing test alert for {track_name}"
     if not lead:
         return f"ASG Racing reminder for {track_name}"
     return f"{track_name} starts in {lead}"
@@ -720,8 +727,6 @@ def build_notification_title(item, trigger_key, time_until_start=None):
 def build_telegram_title(item, trigger_key, time_until_start=None):
     track_name = item.get("track_name") or "Unknown track"
     lead = format_time_until_start_ru(time_until_start)
-    if trigger_key == "test":
-        return f"Тест уведомления ASG Racing: {track_name}"
     if lead:
         return f"Гонка на {track_name} через {lead}"
     return f"Гонка ASG Racing на {track_name}"
@@ -738,6 +743,8 @@ def build_hype_prefix(item, channel="plain"):
 
 
 def build_hype_line(trigger_key, time_until_start=None, channel="plain", item=None):
+    if trigger_key == "test":
+        trigger_key = "12_msk"
     if is_championship_event(item or {}):
         lead = format_time_until_start(time_until_start)
         championship_title = get_championship_title(item or {})
@@ -761,6 +768,8 @@ def build_hype_line(trigger_key, time_until_start=None, channel="plain", item=No
 
 
 def build_telegram_hype_line(trigger_key, time_until_start=None, item=None):
+    if trigger_key == "test":
+        trigger_key = "12_msk"
     lead = format_time_until_start_ru(time_until_start)
     if is_championship_event(item or {}):
         championship_title = escape(get_championship_title(item or {}))
@@ -788,14 +797,17 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     server_name = get_server_name(item)
     server_password = get_server_password(item)
 
-    lines = [
+    lines = []
+    if trigger_key == "test":
+        lines.append(build_test_header(language="en"))
+    lines.extend([
         build_event_type_header(item, language="en"),
         build_notification_title(item, trigger_key, time_until_start),
         build_hype_line(trigger_key, time_until_start, channel="plain", item=item),
         f"Track: {track_name}",
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
-    ]
+    ])
     if race_duration:
         lines.append(f"Race duration: {race_duration} minutes")
     lines.append("Pit-stop rules: see the event page")
@@ -829,14 +841,17 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
     server_name = get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME
     server_password = get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD
 
-    lines = [
+    lines = []
+    if trigger_key == "test":
+        lines.append(build_test_header(language="ru"))
+    lines.extend([
         build_event_type_header(item, language="ru"),
         build_telegram_title(item, trigger_key, time_until_start),
         build_telegram_hype_line(trigger_key, time_until_start, item=item).replace("<b>", "").replace("</b>", ""),
         f"Трасса: {track_name}",
         f"Дата: {date_str}",
         f"Старт: {start_time_local} {timezone_label}".strip(),
-    ]
+    ])
     if race_duration:
         lines.append(f"Гонка: {race_duration} мин")
     lines.append("Правила пит-стопов: смотрите на сайте")
@@ -869,7 +884,10 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     server_name = escape(get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME)
     server_password = escape(get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD)
 
-    lines = [
+    lines = []
+    if trigger_key == "test":
+        lines.extend([build_test_header(language="ru", channel="telegram"), ""])
+    lines.extend([
         build_event_type_header(item, language="ru", channel="telegram"),
         "",
         f"🏁 <b>{title}</b>",
@@ -879,7 +897,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
         f"📍 <b>Трасса:</b> {track_name}",
         f"📅 <b>Дата:</b> {date_str}",
         f"⏰ <b>Старт:</b> {start_time_local} {timezone_label}".strip(),
-    ]
+    ])
 
     if race_duration:
         lines.append(f"⏱ <b>Гонка:</b> {race_duration} мин")
@@ -934,8 +952,9 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
         fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
 
     marker, event_type_label = get_event_type_marker(item, language="en")
+    test_prefix = "🧪 TEST • " if trigger_key == "test" else ""
     embed = {
-        "title": f"{marker} {event_type_label} — {build_notification_title(item, trigger_key, time_until_start)}",
+        "title": f"{test_prefix}{marker} {event_type_label} — {build_notification_title(item, trigger_key, time_until_start)}",
         "description": build_hype_line(trigger_key, time_until_start, channel="discord", item=item),
         "url": details_url,
         "color": 16748032,
@@ -1250,12 +1269,12 @@ def run():
     sent_now = []
 
     if force_send:
-        message = build_plain_message(announcement, "test")
+        message = build_plain_message(announcement, "test", time_until_start)
         if dry_run:
             print(f"[dry-run] would send test notification for {event_id}")
             print(message)
         else:
-            dispatch(announcement, "test")
+            dispatch(announcement, "test", time_until_start)
             print(f"test notification sent for {event_id}")
         state["last_event_id"] = event_id
         update_telegram_pin_state(state)

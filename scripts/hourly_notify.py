@@ -463,7 +463,55 @@ GAME_TIME_EMOJIS = {
 
 
 def is_championship_event(item):
-    return str(item.get("event_type") or "").strip().lower() == "championship"
+    competition_mode = str(item.get("competition_mode") or "").strip().lower()
+    event_type = str(item.get("event_type") or "").strip().lower()
+    return competition_mode == "championship" or event_type == "championship"
+
+
+def is_endurance_event(item):
+    race_format = str(item.get("race_format") or "").strip().lower()
+    event_type = str(item.get("event_type") or "").strip().lower()
+    return race_format == "endurance" or event_type == "endurance"
+
+
+def get_points_multiplier(item):
+    if is_championship_event(item):
+        return None
+    raw_value = item.get("points_multiplier")
+    if raw_value in (None, ""):
+        raw_value = 1 if is_endurance_event(item) else 5
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        value = 1 if is_endurance_event(item) else 5
+    return max(0, value)
+
+
+def format_points_multiplier(item):
+    value = get_points_multiplier(item)
+    if value is None:
+        return ""
+    return f"{value:g}"
+
+
+def get_race_duration_minutes(item):
+    session = item.get("session") if isinstance(item.get("session"), dict) else {}
+    raw_value = item.get("race_duration_minutes")
+    if raw_value in (None, ""):
+        raw_value = session.get("race_duration_minutes")
+    try:
+        value = int(round(float(raw_value)))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def get_event_alert_label(item):
+    if is_championship_event(item):
+        return "championship"
+    if is_endurance_event(item):
+        return "Endurance"
+    return "hourly"
 
 
 def get_championship_title(item):
@@ -650,12 +698,14 @@ def build_telegram_title(item, trigger_key, time_until_start=None):
     return f"Гонка ASG Racing на {track_name}"
 
 
-def build_hype_prefix(channel="plain"):
+def build_hype_prefix(item, channel="plain"):
+    multiplier = format_points_multiplier(item)
+    points_label = f"TAKE X{multiplier} POINTS!"
     if channel == "telegram":
-        return "🔥🔥🔥 <b>TAKE X5 POINTS!</b> 🔥🔥🔥"
+        return f"🔥🔥🔥 <b>{points_label}</b> 🔥🔥🔥"
     if channel == "discord":
-        return "🔥🔥🔥 **TAKE X5 POINTS!** 🔥🔥🔥"
-    return "🔥🔥🔥 TAKE X5 POINTS! 🔥🔥🔥"
+        return f"🔥🔥🔥 **{points_label}** 🔥🔥🔥"
+    return f"🔥🔥🔥 {points_label} 🔥🔥🔥"
 
 
 def build_hype_line(trigger_key, time_until_start=None, channel="plain", item=None):
@@ -666,17 +716,19 @@ def build_hype_line(trigger_key, time_until_start=None, channel="plain", item=No
         emphasis = f"**{championship_label}**" if channel == "discord" else championship_label
         countdown = f" Only {lead} until the start." if lead else ""
         return f"🏆🏁 {emphasis}{countdown} Every position matters — this is where championship points and legends are made!"
-    prefix = build_hype_prefix(channel)
+    item = item or {}
+    prefix = build_hype_prefix(item, channel)
+    race_kind = "Endurance race" if is_endurance_event(item) else "hourly race"
     lead = format_time_until_start(time_until_start)
     if trigger_key == "12_msk":
         if lead:
-            return f"{prefix} {lead} to go. Midday reminder for the next hourly race."
-        return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
+            return f"{prefix} {lead} to go. Midday reminder for the next {race_kind}."
+        return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next {race_kind}."
     if trigger_key == "18_msk":
         if lead:
-            return f"{prefix} {lead} to go. Evening reminder for the next hourly race."
-        return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next hourly race."
-    return f"{prefix} Quick delivery check for the hourly notifier."
+            return f"{prefix} {lead} to go. Evening reminder for the next {race_kind}."
+        return f"{prefix} {get_trigger_label(trigger_key)} reminder for the next {race_kind}."
+    return f"{prefix} Quick delivery check for the race notifier."
 
 
 def build_telegram_hype_line(trigger_key, time_until_start=None, item=None):
@@ -685,11 +737,14 @@ def build_telegram_hype_line(trigger_key, time_until_start=None, item=None):
         championship_title = escape(get_championship_title(item or {}))
         countdown = f" До старта осталось {lead}." if lead else ""
         return f"🏆🏁 <b>ГОНКА ЧЕМПИОНАТА — {championship_title}!</b>{countdown} Каждый поворот и каждая позиция решают судьбу титула — такое нельзя пропустить!"
-    prefix = "🔥🔥🔥 <b>В 5 раз больше очков!</b> 🔥🔥🔥"
+    item = item or {}
+    multiplier = format_points_multiplier(item)
+    prefix = f"🔥🔥🔥 <b>В {multiplier} раз больше очков!</b> 🔥🔥🔥"
+    race_kind = "гонки Endurance" if is_endurance_event(item) else "часовой гонки"
     if trigger_key == "12_msk":
-        return f"{prefix} До ближайшей часовой гонки осталось {lead}." if lead else f"{prefix} Дневное напоминание о часовой гонке."
+        return f"{prefix} До ближайшей {race_kind} осталось {lead}." if lead else f"{prefix} Дневное напоминание о {race_kind}."
     if trigger_key == "18_msk":
-        return f"{prefix} До вечерней часовой гонки осталось {lead}." if lead else f"{prefix} Вечернее напоминание о часовой гонке."
+        return f"{prefix} До вечерней {race_kind} осталось {lead}." if lead else f"{prefix} Вечернее напоминание о {race_kind}."
     return f"{prefix} Проверяем доставку уведомлений."
 
 
@@ -700,6 +755,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
     weather_summary = build_rain_summary(item, language="en")
+    race_duration = get_race_duration_minutes(item)
     server_name = get_server_name(item)
     server_password = get_server_password(item)
 
@@ -710,6 +766,9 @@ def build_plain_message(item, trigger_key, time_until_start=None):
         f"Date: {date_str}",
         f"Start: {start_time_local} {timezone_label}".strip(),
     ]
+    if race_duration:
+        lines.append(f"Race duration: {race_duration} minutes")
+    lines.append("Pit-stop rules: see the event page")
     if server_name:
         lines.append(f"Server: {server_name}")
     if server_password:
@@ -736,6 +795,7 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
     date_str = format_display_date(item.get("date"))
     registrations = item.get("registrations")
     weather_summary = build_rain_summary(item, language="ru")
+    race_duration = get_race_duration_minutes(item)
     server_name = get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME
     server_password = get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD
 
@@ -746,6 +806,9 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
         f"Дата: {date_str}",
         f"Старт: {start_time_local} {timezone_label}".strip(),
     ]
+    if race_duration:
+        lines.append(f"Гонка: {race_duration} мин")
+    lines.append("Правила пит-стопов: смотрите на сайте")
     if weather_summary:
         lines.append(f"Погода: {weather_summary}")
     if registrations not in (None, ""):
@@ -771,6 +834,7 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     hype_line = build_telegram_hype_line(trigger_key, time_until_start, item=item)
     registrations = item.get("registrations")
     weather_summary = build_rain_summary(item, language="ru")
+    race_duration = get_race_duration_minutes(item)
     server_name = escape(get_server_name(item) or DEFAULT_TELEGRAM_SERVER_NAME)
     server_password = escape(get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD)
 
@@ -783,6 +847,10 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
         f"📅 <b>Дата:</b> {date_str}",
         f"⏰ <b>Старт:</b> {start_time_local} {timezone_label}".strip(),
     ]
+
+    if race_duration:
+        lines.append(f"⏱ <b>Гонка:</b> {race_duration} мин")
+    lines.append("🔧 <b>Правила пит-стопов:</b> смотрите на сайте")
 
     game_time = format_game_time(item, language="ru")
     if game_time:
@@ -808,6 +876,7 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     registrations = item.get("registrations")
     image_url = build_track_image_url(item)
     weather_summary = build_rain_summary(item, language="en")
+    race_duration = get_race_duration_minutes(item)
     server_name = get_server_name(item)
     server_password = get_server_password(item)
 
@@ -816,6 +885,9 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
         {"name": "Date", "value": date_str, "inline": True},
         {"name": "Start", "value": f"{start_time_local} {timezone_label}".strip(), "inline": True},
     ]
+    if race_duration:
+        fields.append({"name": "Race duration", "value": f"{race_duration} minutes", "inline": True})
+    fields.append({"name": "Pit-stop rules", "value": "See the event page", "inline": True})
     if server_name:
         fields.append({"name": "Server", "value": f"`{server_name}`", "inline": False})
     if server_password:
@@ -839,7 +911,7 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
         embed["image"] = {"url": image_url}
 
     return {
-        "content": "@everyone 🏁 ASG Racing hourly alert",
+        "content": f"@everyone 🏁 ASG Racing {get_event_alert_label(item)} alert",
         "allowed_mentions": {
             "parse": ["everyone"]
         },

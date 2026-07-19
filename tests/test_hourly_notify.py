@@ -93,6 +93,12 @@ class NotificationTemplateTests(unittest.TestCase):
         self.assertEqual(fields["Pit-stop rules"], "See the event page")
         self.assertIn("Endurance alert", message["content"])
 
+    def test_discord_test_delivery_does_not_ping_everyone(self):
+        message = hourly_notify.build_discord_payload(event_payload(), "test")
+
+        self.assertNotIn("@everyone", message["content"])
+        self.assertEqual(message["allowed_mentions"]["parse"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -910,10 +910,12 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     if image_url:
         embed["image"] = {"url": image_url}
 
+    is_test = trigger_key == "test"
+    mention_prefix = "" if is_test else "@everyone "
     return {
-        "content": f"@everyone 🏁 ASG Racing {get_event_alert_label(item)} alert",
+        "content": f"{mention_prefix}🏁 ASG Racing {get_event_alert_label(item)} alert",
         "allowed_mentions": {
-            "parse": ["everyone"]
+            "parse": [] if is_test else ["everyone"]
         },
         "embeds": [embed],
         "components": build_discord_link_button(details_url),

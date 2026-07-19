@@ -514,6 +514,35 @@ def get_event_alert_label(item):
     return "hourly"
 
 
+def get_event_type_marker(item, language="en"):
+    championship = is_championship_event(item)
+    endurance = is_endurance_event(item)
+    if language == "ru":
+        if championship and endurance:
+            return "🟣🟢", "ЭТАП ЧЕМПИОНАТА • ENDURANCE"
+        if championship:
+            return "🟣", "ЭТАП ЧЕМПИОНАТА"
+        if endurance:
+            return "🟢", "ENDURANCE SPECIAL EVENT"
+        return "🟠", "ЕЖЕДНЕВНАЯ ЧАСОВАЯ ГОНКА"
+    if championship and endurance:
+        return "🟣🟢", "CHAMPIONSHIP ROUND • ENDURANCE"
+    if championship:
+        return "🟣", "CHAMPIONSHIP ROUND"
+    if endurance:
+        return "🟢", "ENDURANCE SPECIAL EVENT"
+    return "🟠", "DAILY HOURLY RACE"
+
+
+def build_event_type_header(item, language="en", channel="plain"):
+    marker, label = get_event_type_marker(item, language)
+    if channel == "telegram":
+        return f"{marker} <b>{label}</b>"
+    if channel == "discord":
+        return f"{marker} **{label}**"
+    return f"{marker} {label}"
+
+
 def get_championship_title(item):
     championship = item.get("championship") if isinstance(item.get("championship"), dict) else {}
     for candidate in (
@@ -760,6 +789,7 @@ def build_plain_message(item, trigger_key, time_until_start=None):
     server_password = get_server_password(item)
 
     lines = [
+        build_event_type_header(item, language="en"),
         build_notification_title(item, trigger_key, time_until_start),
         build_hype_line(trigger_key, time_until_start, channel="plain", item=item),
         f"Track: {track_name}",
@@ -800,6 +830,7 @@ def build_telegram_text_message(item, trigger_key, time_until_start=None):
     server_password = get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD
 
     lines = [
+        build_event_type_header(item, language="ru"),
         build_telegram_title(item, trigger_key, time_until_start),
         build_telegram_hype_line(trigger_key, time_until_start, item=item).replace("<b>", "").replace("</b>", ""),
         f"Трасса: {track_name}",
@@ -839,6 +870,8 @@ def build_photo_caption(item, trigger_key, time_until_start=None):
     server_password = escape(get_server_password(item) or DEFAULT_TELEGRAM_SERVER_PASSWORD)
 
     lines = [
+        build_event_type_header(item, language="ru", channel="telegram"),
+        "",
         f"🏁 <b>{title}</b>",
         "",
         hype_line,
@@ -900,8 +933,9 @@ def build_discord_payload(item, trigger_key, time_until_start=None):
     if registrations not in (None, ""):
         fields.append({"name": "Registered drivers", "value": str(registrations), "inline": True})
 
+    marker, event_type_label = get_event_type_marker(item, language="en")
     embed = {
-        "title": build_notification_title(item, trigger_key, time_until_start),
+        "title": f"{marker} {event_type_label} — {build_notification_title(item, trigger_key, time_until_start)}",
         "description": build_hype_line(trigger_key, time_until_start, channel="discord", item=item),
         "url": details_url,
         "color": 16748032,

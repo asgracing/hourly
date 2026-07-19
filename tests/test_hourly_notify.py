@@ -37,6 +37,7 @@ class NotificationTemplateTests(unittest.TestCase):
         caption = hourly_notify.build_photo_caption(event_payload(), "18_msk", timedelta(hours=3))
 
         for expected in (
+            "🟠 <b>ЕЖЕДНЕВНАЯ ЧАСОВАЯ ГОНКА</b>",
             "В 5 раз больше очков!",
             "Трасса:</b> Monza",
             "Дата:</b> 19.07.2026",
@@ -61,6 +62,7 @@ class NotificationTemplateTests(unittest.TestCase):
         caption = hourly_notify.build_photo_caption(payload, "12_msk", timedelta(hours=3))
 
         self.assertIn("В 10 раз больше очков!", caption)
+        self.assertIn("🟢 <b>ENDURANCE SPECIAL EVENT</b>", caption)
         self.assertIn("гонки Endurance", caption)
         self.assertIn("Гонка:</b> 120 мин", caption)
 
@@ -74,6 +76,7 @@ class NotificationTemplateTests(unittest.TestCase):
         caption = hourly_notify.build_photo_caption(payload, "18_msk", timedelta(hours=3))
 
         self.assertIn("ГОНКА ЧЕМПИОНАТА — ASG Racing July 2026!", caption)
+        self.assertIn("🟣 <b>ЭТАП ЧЕМПИОНАТА</b>", caption)
         self.assertNotIn("раз больше очков", caption)
         self.assertIn("Правила пит-стопов:</b> смотрите на сайте", caption)
 
@@ -92,6 +95,18 @@ class NotificationTemplateTests(unittest.TestCase):
         self.assertEqual(fields["Race duration"], "120 minutes")
         self.assertEqual(fields["Pit-stop rules"], "See the event page")
         self.assertIn("Endurance alert", message["content"])
+        self.assertTrue(embed["title"].startswith("🟢 ENDURANCE SPECIAL EVENT —"))
+
+    def test_endurance_championship_has_combined_type_marker(self):
+        payload = event_payload(
+            event_type="championship",
+            race_format="endurance",
+            competition_mode="championship",
+            championship_title="ASG Endurance Cup",
+        )
+        caption = hourly_notify.build_photo_caption(payload, "18_msk", timedelta(hours=3))
+
+        self.assertIn("🟣🟢 <b>ЭТАП ЧЕМПИОНАТА • ENDURANCE</b>", caption)
 
     def test_discord_test_delivery_does_not_ping_everyone(self):
         message = hourly_notify.build_discord_payload(event_payload(), "test")

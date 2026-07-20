@@ -717,9 +717,12 @@
         "12_msk": "2026-07-20T10:09:35+00:00",
         "18_msk": "2026-07-20T16:13:41+00:00"
       }
+    },
+    "hourly_2026-07-21_2100": {
+      "sent": {}
     }
   },
-  "last_event_id": "hourly_2026-07-20_2100",
+  "last_event_id": "hourly_2026-07-21_2100",
   "telegram": {
     "last_pinned_message_id": 44188
   }

@@ -17,17 +17,32 @@ DEFAULT_DELIVERY_ATTEMPTS = 2
 DEFAULT_VOTES_API_BASE = "https://hourly-votes.asgracing.workers.dev"
 SITE_BASE_URL = "https://asgracing.ru"
 HOURLY_PAGE_URL = f"{SITE_BASE_URL}/hourly/"
-TRACK_IMAGE_BASE_URL = f"{HOURLY_PAGE_URL}assets/tracks"
+TRACK_IMAGE_BASE_URL = f"{SITE_BASE_URL}/assets"
 TRACK_IMAGE_ALIASES = {
-    "spa": "spa",
+    "barcelona": "barcelona",
+    "hungaroring": "hungaroring",
+    "imola": "imola",
+    "kyalami": "kyalami",
+    "laguna_seca": "laguna_seca",
+    "lagunaseca": "laguna_seca",
+    "misano": "misano",
     "monza": "monza",
-    "silverstone": "silverstone",
+    "monzatg": "monza",
+    "mount_panorama": "mount_panorama",
+    "mountpanorama": "mount_panorama",
     "nurburgring": "nurburgring",
     "nurburgring_24h": "nurburgring_24h",
     "nurburgring24h": "nurburgring_24h",
     "nurburgring-24h": "nurburgring_24h",
     "nordschleife": "nurburgring_24h",
     "nordschl": "nurburgring_24h",
+    "paul_ricard": "paul_ricard",
+    "paulricard": "paul_ricard",
+    "silverstone": "silverstone",
+    "spa": "spa",
+    "suzuka": "suzuka",
+    "zandvoort": "zandvoort",
+    "zolder": "zolder",
 }
 RACE_PAGE_BUTTON_LABEL = "ХОЧУ ПОЕХАТЬ!"
 COPY_SERVER_BUTTON_LABEL = "СЕРВЕР"

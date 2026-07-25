@@ -33,6 +33,29 @@ def event_payload(**overrides):
 
 
 class NotificationTemplateTests(unittest.TestCase):
+    def test_mount_panorama_uses_shared_track_asset_for_both_channels(self):
+        payload = event_payload(track_code="mount_panorama", track_name="Mount Panorama")
+
+        expected = "https://asgracing.ru/assets/mount_panorama.jpg"
+        self.assertEqual(hourly_notify.build_track_image_url(payload, "telegram"), expected)
+        self.assertEqual(hourly_notify.build_track_image_url(payload, "discord"), expected)
+        self.assertEqual(
+            hourly_notify.build_discord_payload(payload, "18_msk")["embeds"][0]["image"]["url"],
+            expected,
+        )
+
+    def test_monza_keeps_telegram_specific_image(self):
+        payload = event_payload()
+
+        self.assertEqual(
+            hourly_notify.build_track_image_url(payload, "telegram"),
+            "https://asgracing.ru/assets/monzaTG.jpg",
+        )
+        self.assertEqual(
+            hourly_notify.build_track_image_url(payload, "discord"),
+            "https://asgracing.ru/assets/monza.jpg",
+        )
+
     def test_hourly_caption_keeps_existing_details_and_adds_compact_fields(self):
         caption = hourly_notify.build_photo_caption(event_payload(), "18_msk", timedelta(hours=3))
 

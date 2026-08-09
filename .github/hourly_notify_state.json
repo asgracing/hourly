@@ -832,11 +832,13 @@
       }
     },
     "hourly_2026-08-09_2100": {
-      "sent": {}
+      "sent": {
+        "12_msk": "2026-08-09T09:20:59+00:00"
+      }
     }
   },
   "last_event_id": "hourly_2026-08-09_2100",
   "telegram": {
-    "last_pinned_message_id": 49381
+    "last_pinned_message_id": 49438
   }
 }

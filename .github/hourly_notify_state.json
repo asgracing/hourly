@@ -842,9 +842,12 @@
         "12_msk": "2026-08-10T09:57:21+00:00",
         "18_msk": "2026-08-10T15:37:17+00:00"
       }
+    },
+    "hourly_2026-08-11_2100": {
+      "sent": {}
     }
   },
-  "last_event_id": "hourly_2026-08-10_2100",
+  "last_event_id": "hourly_2026-08-11_2100",
   "telegram": {
     "last_pinned_message_id": 49599
   }

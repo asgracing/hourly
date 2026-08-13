@@ -11,9 +11,6 @@ on:
         description: "Build and send immediately, without waiting for the 12:00/18:00 MSK window"
         required: false
         default: "false"
-  schedule:
-    # GitHub cron runs in UTC. This covers 10:00-20:59 MSK (UTC+3).
-    - cron: "*/5 7-17 * * *"
 
 permissions:
   contents: write
